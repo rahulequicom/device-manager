@@ -61,3 +61,41 @@ test('existing admin signs in with an existing password and opens admin without 
   await expect(page).toHaveURL(/\/admin\/?$/);
   expect(changed).toBe(false);expect(employeeActivation).toBe(false);
 });
+
+test('login links directly to recovery and requests the app callback without changing the password',async ({page})=>{
+  let requests=0;let changes=0;
+  await page.route('https://*.supabase.co/**',async route=>{
+    const url=new URL(route.request().url());
+    if(url.pathname.endsWith('/recover')){requests++;expect(route.request().postDataJSON().email).toBe('arshad@example.test');expect(url.searchParams.get('redirect_to')).toBe('http://localhost:3000/signup');}
+    if(url.pathname.endsWith('/user')&&route.request().method()==='PUT')changes++;
+    await route.fulfill({status:200,contentType:'application/json',body:'{}'});
+  });
+  await page.goto('/admin?cloud=1');
+  await page.getByRole('link',{name:'Forgot your password?',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Reset your password',exact:true})).toBeVisible();
+  await expect(page.getByLabel('Password',{exact:true})).toHaveCount(0);
+  await page.getByLabel('Work email',{exact:true}).fill('arshad@example.test');
+  await page.getByRole('button',{name:'Send reset email',exact:true}).click();
+  await expect(page.getByRole('status')).toContainText('Your password is unchanged until you save a new one.');
+  expect(requests).toBe(1);expect(changes).toBe(0);
+});
+
+test('a recovery callback opens new-password entry and saves only after user submission',async ({page})=>{
+  const user={id:'reset-admin',email:'arshad@example.test'};
+  const jwt=[Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url'),Buffer.from(JSON.stringify({sub:user.id,email:user.email,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+3600})).toString('base64url'),Buffer.from('test-signature').toString('base64url')].join('.');
+  let updates=0;
+  await page.route('https://*.supabase.co/**',async route=>{
+    const url=new URL(route.request().url());let body:unknown=[];
+    if(url.pathname.endsWith('/user')){if(route.request().method()==='PUT'){expect(route.request().postDataJSON().password).toBe('482915');updates++;}body=user;}
+    else if(url.pathname.endsWith('/dm_admins'))body={user_id:user.id};
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
+  });
+  await page.goto(`/signup#access_token=${jwt}&refresh_token=test-refresh&expires_in=3600&token_type=bearer&type=recovery`);
+  await expect(page.getByRole('heading',{name:'Reset your password',exact:true})).toBeVisible();
+  await page.getByLabel('New password',{exact:true}).fill('482915');
+  await page.getByLabel('Confirm password',{exact:true}).fill('482915');
+  expect(updates).toBe(0);
+  await page.getByRole('button',{name:'Save password and continue',exact:true}).click();
+  await expect(page).toHaveURL(/\/admin\/?$/);
+  expect(updates).toBe(1);
+});

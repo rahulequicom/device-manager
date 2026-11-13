@@ -14,6 +14,7 @@ export function EmployeeSignup() {
   const [email, setEmail] = useState("");
   const [created, setCreated] = useState(false);
   const [login, setLogin] = useState(false);
+  const [requestReset, setRequestReset] = useState(false);
   const [recovery, setRecovery] = useState(false);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
@@ -22,6 +23,7 @@ export function EmployeeSignup() {
   useEffect(() => {
     if (!client) { setReady(true); return; }
     let active = true;
+    if (new URLSearchParams(window.location.search).get("mode") === "reset") { setRequestReset(true); setLogin(true); }
     const { data: { subscription } } = client.auth.onAuthStateChange((event, next) => {
       if (active) { setSession(next); setReady(true); if (event === "PASSWORD_RECOVERY") setRecovery(true); }
     });
@@ -45,6 +47,7 @@ export function EmployeeSignup() {
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!client || lock.current) return;
+    if (!session && requestReset) { await recover(); return; }
     const element = event.currentTarget; const form = new FormData(element);
     lock.current = true; setBusy(true); setFailure(""); setNotice("");
     try {
@@ -80,20 +83,20 @@ export function EmployeeSignup() {
     try {
       const result = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: redirectUrl() });
       if (result.error) throw result.error;
-      setNotice("If an account exists, check your inbox for the password reset link.");
+      setNotice("If an account exists, check your inbox for the password reset link. Your password is unchanged until you save a new one.");
     } catch (error) { setFailure(errorMessage(error)); } finally { setBusy(false); }
   }
-  const title = session ? recovery ? "Reset your password" : "Open your workspace" : created ? "Verify your work email" : login ? "Sign in" : "Join your device workspace";
+  const title = session ? recovery ? "Reset your password" : "Open your workspace" : requestReset ? "Reset your password" : created ? "Verify your work email" : login ? "Sign in" : "Join your device workspace";
   return <main className="signup-page"><section className="signup-story"><a className="brand" href={appPath("/")}><span className="brand-mark"><Layers3 size={24} /></span><span>Device<strong>Management</strong></span></a><p className="eyebrow">For your team</p><h1>Your devices.<br />Your workspace.</h1><p>Register a device, keep track of what’s yours, and make every handover simple.</p><ol><li>Register with your approved work email</li><li>Choose your password and verify your email</li><li>See the devices assigned to you</li></ol></section><section className="signup-form-panel"><div className="signup-form-content"><p className="eyebrow">Account access</p><h2>{title}</h2>
     {!ready ? <p role="status">Checking your session...</p> : !client ? <p role="alert">Supabase connection is not configured.</p> : <>
     {created && !session ? <div className="signup-instructions"><p>Check your work inbox for the verification link, then sign in with the password you chose.</p><button className="button secondary" onClick={() => { setCreated(false); setLogin(true); }}>Email verified? Sign in</button></div> : <form className="modal-form" onSubmit={submit}>
       {session ? <p>Signed in as <strong>{session.user.email}</strong></p> : <label>Work email<input type="email" name="email" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@company.com" /></label>}
-      {(!session || recovery) && <><label>{recovery ? "New password" : "Password"}<input name="password" type="password" autoComplete={login && !recovery ? "current-password" : "new-password"} minLength={login && !recovery ? undefined : 6} maxLength={login && !recovery ? undefined : 6} inputMode={login && !recovery ? undefined : "numeric"} pattern={login && !recovery ? undefined : "[0-9]{6}"} required /></label>{(!login || recovery) && <label>Confirm password<input name="confirm" type="password" autoComplete="new-password" minLength={6} maxLength={6} inputMode="numeric" pattern="[0-9]{6}" required /></label>}{(!login || recovery) && <p className="muted">Choose exactly six digits (0–9). Use the same password when you sign in.</p>}</>}
-      {!session && !login && <p className="muted">Your work email must be approved before you can access employee devices.</p>}
-      <button className="button primary" disabled={busy}>{busy ? "Please wait..." : session ? recovery ? "Save password and continue" : "Continue to workspace" : login ? "Sign in" : "Create account"}</button>
+      {((!session && !requestReset) || recovery) && <><label>{recovery ? "New password" : "Password"}<input name="password" type="password" autoComplete={login && !recovery ? "current-password" : "new-password"} minLength={login && !recovery ? undefined : 6} maxLength={login && !recovery ? undefined : 6} inputMode={login && !recovery ? undefined : "numeric"} pattern={login && !recovery ? undefined : "[0-9]{6}"} required /></label>{(!login || recovery) && <label>Confirm password<input name="confirm" type="password" autoComplete="new-password" minLength={6} maxLength={6} inputMode="numeric" pattern="[0-9]{6}" required /></label>}{(!login || recovery) && <p className="muted">Choose exactly six digits (0–9). Use the same password when you sign in.</p>}</>}
+      {!session && !login && !requestReset && <p className="muted">Your work email must be approved before you can access employee devices.</p>}
+      <button className="button primary" disabled={busy}>{busy ? "Please wait..." : session ? recovery ? "Save password and continue" : "Continue to workspace" : requestReset ? "Send reset email" : login ? "Sign in" : "Create account"}</button>
     </form>}
     {failure && <p role="alert" className="form-error">{failure}</p>}{notice && <p role="status">{notice}</p>}
-    {session ? <button className="text-button" disabled={busy} onClick={async () => { const result = await client.auth.signOut(); if (result.error) setFailure(errorMessage(result.error)); else { setCreated(false); setRecovery(false); setLogin(true); } }}>Use a different account</button> : !created && <><button className="text-button" disabled={busy} onClick={() => { setLogin(!login); setFailure(""); }}>{login ? "Create an account" : "Already registered? Sign in"}</button>{login && <button className="text-button" disabled={busy} onClick={() => void recover()}>Forgot your password?</button>}</>}
+    {session ? <button className="text-button" disabled={busy} onClick={async () => { const result = await client.auth.signOut(); if (result.error) setFailure(errorMessage(result.error)); else { setCreated(false); setRecovery(false); setLogin(true); } }}>Use a different account</button> : !created && <><button className="text-button" disabled={busy} onClick={() => { setLogin(requestReset ? true : !login); setRequestReset(false); setFailure(""); setNotice(""); }}>{requestReset ? "Back to sign in" : login ? "Create an account" : "Already registered? Sign in"}</button>{login && !requestReset && <button className="text-button" disabled={busy} onClick={() => { setRequestReset(true); setFailure(""); setNotice(""); }}>Forgot your password?</button>}</>}
     <a className="signup-back" href={appPath("/?cloud=1")}>Back to sign in</a>
     </>}
   </div></section></main>;

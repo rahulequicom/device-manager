@@ -86,6 +86,7 @@ export function SignIn({ client, initialError }: { client: SupabaseClient; initi
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="button primary" disabled={pending}><ShieldCheck size={17} />{pending ? "Signing in..." : "Sign in"}</button>
     </form>
+    <p><a href={appPath("/signup?mode=reset")}>Forgot your password?</a></p>
     <p className="muted">New employee? <a href={appPath("/signup")}>Create your account</a></p>
   </AccessFrame>;
 }
