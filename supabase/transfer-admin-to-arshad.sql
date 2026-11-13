@@ -13,9 +13,9 @@ begin
   select id into previous_admin from auth.users where lower(email)='bkatiyar197@gmail.com';
   if previous_admin is null then raise exception 'Existing bkatiyar197 account not found.'; end if;
   select member_id into existing_member from public.dm_employees where user_id=previous_admin;
-  insert into public.dm_members(name,team,role) values('Arshad','QA','')
+  insert into public.dm_members(name,team,role) values('Bhumika','Design','')
     on conflict(lower(trim(name)),team) do nothing;
-  select id into employee_member from public.dm_members where lower(trim(name))='arshad' and team='QA';
+  select id into employee_member from public.dm_members where lower(trim(name))='bhumika' and team='Design';
   if existing_member is not null and existing_member <> employee_member then
     raise exception 'Existing employee mapping differs. Review before changing it.';
   end if;

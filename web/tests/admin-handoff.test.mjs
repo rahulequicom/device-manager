@@ -22,7 +22,7 @@ test('admin handoff requires the new confirmed account and preserves former admi
     await db.exec(script); await db.exec(script);
     assert.deepEqual((await db.query('select user_id from dm_admins')).rows,[{user_id:newId}]);
     const employee=(await db.query('select m.name,m.team from dm_employees e join dm_members m on m.id=e.member_id where e.user_id=$1',[oldId])).rows[0];
-    assert.deepEqual(employee,{name:'Arshad',team:'QA'});
+    assert.deepEqual(employee,{name:'Bhumika',team:'Design'});
     await db.exec('set role authenticated');
     await db.query("select set_config('request.jwt.claim.sub',$1,false)",[oldId]);
     assert.equal((await db.query('select dm_is_admin() as value')).rows[0].value,false);
