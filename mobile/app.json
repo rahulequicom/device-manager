@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Device Management",
+    "slug": "device-management",
+    "scheme": "device-register",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.company.deviceregister"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": true,
+      "package": "com.company.deviceregister"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Device Management to scan phone asset labels.",
+          "recordAudioAndroid": false,
+          "microphonePermission": false
+        }
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-local-authentication"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
