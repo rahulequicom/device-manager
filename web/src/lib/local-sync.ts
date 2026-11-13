@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditEvent, Device } from "./device-data";
 import { pendingLocalChanges, acknowledgeLocalChanges } from "./local-register";
 
-const editable = ["name", "model_name", "model_number", "serial_number", "ios_version", "platform", "capacity", "wifi_address", "bluetooth_address", "barcode", "ram", "allocation_team", "availability_confirmed", "holder_id", "retired"] as const;
+const editable = ["name", "model_name", "model_number", "serial_number", "ios_version", "platform", "capacity", "wifi_address", "bluetooth_address", "barcode", "ram", "allocation_team", "availability_confirmed", "holder_id", "retired", "imei", "imei2", "eid", "upc"] as const;
 
 // Compare only locally edited fields. Never upload the seed or local version counters.
 export function planLocalSync(events: AuditEvent[], remote: Device) {
@@ -16,7 +16,7 @@ export function planLocalSync(events: AuditEvent[], remote: Device) {
   if (!first || !last) throw new Error(`Missing local change history for ${remote.name}.`);
   const patch: Partial<Device> = {};
   for (const field of editable) {
-    if (!(field in first) || !(field in last)) throw new Error(`Incomplete local change history for ${remote.name}.`);
+    if (!["imei", "imei2", "eid", "upc"].includes(field) && (!(field in first) || !(field in last))) throw new Error(`Incomplete local change history for ${remote.name}.`);
     if ((first[field] ?? null) === (last[field] ?? null)) continue;
     if ((remote[field] ?? null) === (last[field] ?? null)) continue;
     if ((remote[field] ?? null) !== (first[field] ?? null)) throw new Error(`Sync conflict for ${remote.name}: ${field} changed in Supabase. Local edits are retained.`);

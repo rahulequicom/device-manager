@@ -1,5 +1,5 @@
 const seed: typeof import("./local-seed.json") = process.env.NODE_ENV === "development" ? require("./local-seed.json") : [];
-import type { Device, Member, AuditEvent } from "./device-data";
+import type { Device, DeviceInput, Member, AuditEvent } from "./device-data";
 const key = "device-manager-local-inventory-v1";
 type Register = { devices: Device[]; members: Member[]; audit: AuditEvent[]; syncedAuditIds?: string[] };
 export function isLocalInventory() {
@@ -53,14 +53,14 @@ export function acknowledgeLocalChanges(ids: string[]) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-export function localAddDevice(input: { name: string; model_name: string; platform: "iOS" | "Android"; serial_number: string | null; capacity: string | null; barcode: string }, holderId: string | null) {
+export function localAddDevice(input: Pick<DeviceInput, "name" | "model_name" | "platform" | "serial_number" | "capacity" | "barcode"> & Partial<DeviceInput>, holderId: string | null) {
   const value = read();
   if (!input.name.trim() || !input.model_name.trim()) throw new Error("Name and model are required.");
   if (holderId && !value.members.some(member => member.id === holderId)) throw new Error("Choose an existing employee.");
   const serial = input.serial_number?.trim().toUpperCase() || null;
   const barcode = input.barcode.trim() || `EQ-${crypto.randomUUID()}`;
   if (value.devices.some(device => device.barcode.toLowerCase() === barcode.toLowerCase() || (serial && device.serial_number?.toUpperCase() === serial))) throw new Error("That serial number or barcode is already registered.");
-  const device: Device = { ...input, id: crypto.randomUUID(), name: input.name.trim(), model_name: input.model_name.trim(), serial_number: serial, barcode, model_number: "", ios_version: "", wifi_address: "", bluetooth_address: "", holder_id: holderId, availability_confirmed: !!holderId, allocation_team: null, ram: null, retired: false, version: 1, updated_at: new Date().toISOString() };
+  const device: Device = { ...input, id: crypto.randomUUID(), name: input.name.trim(), model_name: input.model_name.trim(), serial_number: serial, barcode, model_number: input.model_number ?? "", ios_version: input.ios_version ?? "", wifi_address: input.wifi_address ?? "", bluetooth_address: input.bluetooth_address ?? "", holder_id: holderId, availability_confirmed: true, allocation_team: input.allocation_team ?? null, ram: input.ram ?? null, retired: false, version: 1, updated_at: new Date().toISOString() };
   value.devices.push(device);
   value.audit.unshift({ id: crypto.randomUUID(), device_id: device.id, device_name: device.name, action: "Registered", actor: "Local coordinator", created_at: device.updated_at, before_data: null, after_data: device });
   write(value); return device;

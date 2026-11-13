@@ -89,7 +89,7 @@ test('people upload before assignments and retries reuse their IDs', async () =>
 });
 
 test('new local registrations insert with stable IDs and retry without duplicating', async () => {
-  const registered = { ...before, version: 1 };
+  const registered = { ...before, version: 1, imei: "123456789012345" };
   let stored = null; let inserts = 0;
   const connected = client(); const originalFrom = connected.from;
   connected.from = table => {
@@ -105,6 +105,7 @@ test('new local registrations insert with stable IDs and retry without duplicati
     await api.syncLocalInventory(connected);
     assert.equal(inserts, 1); assert.equal(stored.id, registered.id);
     assert.equal('version' in stored, false);
+    assert.equal(stored.imei, registered.imei);
     await api.syncLocalInventory(connected);
     assert.equal(inserts, 1);
     stored = { ...stored, name: 'Cloud changed registration' };

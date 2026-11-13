@@ -30,9 +30,10 @@ export type Device = {
   ram?: string | null;
   availability_confirmed?: boolean;
 };
-export type DeviceInput = Pick<Device, "name" | "model_name" | "model_number" | "serial_number" | "ios_version" | "capacity" | "wifi_address" | "bluetooth_address" | "barcode" | "ram" | "allocation_team" | "availability_confirmed"> & { platform: Platform; holder_id?: string | null };
+export type DeviceInput = Pick<Device, "name" | "model_name" | "model_number" | "serial_number" | "ios_version" | "capacity" | "wifi_address" | "bluetooth_address" | "barcode" | "ram" | "allocation_team" | "availability_confirmed" | "imei" | "imei2" | "eid" | "upc"> & { platform: Platform; holder_id?: string | null };
+export type EmployeeDevice = Pick<Device, "id" | "name" | "holder_id" | "retired" | "version" | "availability_confirmed">;
 export type AuditEvent = { id: string; device_id: string; device_name: string; action: string; actor: string; created_at: string; before_data: Partial<Device> | null; after_data: Partial<Device> };
-export function deviceStatus(device: Device): DeviceStatus {
+export function deviceStatus(device: Pick<Device, "retired" | "holder_id" | "availability_confirmed">): DeviceStatus {
   if (device.retired) return "Retiring";
   if (device.holder_id) return "Assigned";
   if (device.availability_confirmed === false) return "Not confirmed";

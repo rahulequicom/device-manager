@@ -1,4 +1,4 @@
-import { isLocalInventory, localRegister, localAudit, localUpdate, localAddMember } from "./local-register";
+import { isLocalInventory, localRegister, localAudit, localUpdate, localAddMember, localAddDevice } from "./local-register";
 import { getSupabase } from "./supabase";
 import type { AuditEvent, Device, DeviceInput, Member } from "./device-data";
 
@@ -70,4 +70,11 @@ export async function addMember(input: Omit<Member, "id">) {
   const { data, error } = await database().from("dm_members").insert(input).select().single();
   if (error) throw error;
   return data as Member;
+}
+
+export async function addDevice(input: DeviceInput) {
+  if (isLocalInventory()) return localAddDevice(input, null);
+  const { data, error } = await database().from("dm_devices").insert({ ...input, availability_confirmed: true }).select().single();
+  if (error) throw error;
+  return data as Device;
 }

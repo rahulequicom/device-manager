@@ -1,0 +1,56 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile, readdir } from 'node:fs/promises';
+import { PGlite } from '@electric-sql/pglite';
+
+test('private specifications, safe catalog/history, atomic self assignment and holder-only transfers', async () => {
+  const db = new PGlite();
+  const alice='10000000-0000-4000-8000-000000000001', bob='10000000-0000-4000-8000-000000000002', admin='10000000-0000-4000-8000-000000000003', outsider='10000000-0000-4000-8000-000000000004';
+  try {
+    await db.exec(`create role anon; create role authenticated; create schema auth;
+      create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);
+      create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+      grant usage on schema public,auth to anon,authenticated;
+      insert into auth.users values ('${alice}','alice@example.test',now()),('${bob}','bob@example.test',now()),('${admin}','admin@example.test',now()),('${outsider}','outsider@example.test',now());`);
+    const folder=new URL('../../supabase/migrations/',import.meta.url);
+    for (const file of (await readdir(folder)).filter(x=>x.endsWith('.sql')).sort()) await db.exec(await readFile(new URL(file,folder),'utf8'));
+    const a=(await db.query("insert into dm_members(name,team) values ('Alice','QA') returning id")).rows[0].id;
+    const b=(await db.query("insert into dm_members(name,team) values ('Bob','QA') returning id")).rows[0].id;
+    await db.query('insert into dm_employees values ($1,$2),($3,$4)',[alice,a,bob,b]);
+    await db.query('insert into dm_admins values ($1)',[admin]);
+    await db.exec('set role authenticated');
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);
+    const device=(await db.query("insert into dm_devices(name,model_name,serial_number,barcode,imei,availability_confirmed) values ('Shared phone','Private model','SECRET-SERIAL','SECRET-ASSET','123456789012345',true) returning *")).rows[0];
+    await db.query("update dm_devices set imei2='234567890123456' where id=$1",[device.id]);
+    const version=(await db.query('select version from dm_devices where id=$1',[device.id])).rows[0].version;
+    assert.match(JSON.stringify((await db.query('select dm_mobile_inventory()')).rows), /SECRET-SERIAL/);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[outsider]);
+    await assert.rejects(db.query('select * from dm_employee_catalog()'), /Employee access required/);
+    await assert.rejects(db.query('select dm_employee_self_assign($1,$2)',[device.id,version]), /Employee access required/);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[alice]);
+    assert.equal((await db.query('select * from dm_devices')).rows.length,0);
+    const catalog=(await db.query('select * from dm_employee_catalog()')).rows;
+    assert.deepEqual(Object.keys(catalog[0]).sort(), ['availability_confirmed','holder_id','id','name','retired','version']);
+    await assert.rejects(db.query('select dm_mobile_inventory()'), /Admin access required/);
+    await assert.rejects(db.query('select dm_admin_mobile_inventory()'), /permission denied/);
+    await assert.rejects(db.query("select dm_employee_add_device('{}')"), /permission denied/);
+    await db.query('select dm_employee_self_assign($1,$2)',[device.id,version]);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[bob]);
+    await assert.rejects(db.query('select dm_employee_self_assign($1,$2)',[device.id,version]), /no longer available/);
+    await assert.rejects(db.query('select dm_employee_transfer($1,$2,$3)',[device.id,a,version+1]), /no longer assigned/);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[alice]);
+    await assert.rejects(db.query('select dm_employee_transfer($1,$2,$3)',[device.id,b,version]), /changed/);
+    await db.query('select dm_employee_transfer($1,$2,$3)',[device.id,b,version+1]);
+    assert.equal((await db.query('select * from dm_audit_events')).rows.length,0);
+    const history=(await db.query('select * from dm_employee_activity()')).rows;
+    assert.equal(history.length,2);
+    assert.equal(history[0].after_data.holder_id,b);
+    assert.ok(history.every(row=>Object.keys(row.after_data).join(',')==='holder_id'));
+    assert.doesNotMatch(JSON.stringify(history), /SECRET|Private model|123456789012345/);
+    assert.match(history[0].action,/Transferred from Alice.*Bob/);
+    assert.ok(history[0].created_at);
+    await db.exec('reset role; set role anon');
+    await assert.rejects(db.query('select dm_mobile_inventory()'), /permission denied/);
+    await assert.rejects(db.query('select * from dm_employee_catalog()'), /permission denied/);
+  } finally { await db.close(); }
+});

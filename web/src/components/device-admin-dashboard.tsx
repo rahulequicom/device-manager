@@ -11,14 +11,14 @@ import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Ellipsis, ClipboardList, FileText, MapPin, Smartphone, Users, Plus, Search, RefreshCw, LogOut, X, Pencil, UserRoundCheck, RotateCcw, Archive, Copy, ChevronLeft, ChevronRight, Layers3, SlidersHorizontal } from "lucide-react";
 import { type Device, type DeviceInput, type Member, type Team, type Platform, deviceStatus, statusOrder, statusTone, teams, platforms, formatDate } from "@/lib/device-data";
-import { addMember, changeDevice, errorMessage, loadAudit, loadRegister, saveDevice } from "@/lib/register-api";
+import { addDevice, addMember, changeDevice, errorMessage, loadAudit, loadRegister, saveDevice } from "@/lib/register-api";
 import { ActivityFeed } from "./activity-feed";
 import { LocalCloudSync } from "./local-cloud-sync";
 import { isLocalInventory } from "@/lib/local-register";
 import { getSupabase } from "@/lib/supabase";
 
 type View = "Inventory" | "Track device" | "People" | "Activity";
-type Modal = { kind: "device"; device: Device } | { kind: "member" } | { kind: "assign"; device: Device } | null;
+type Modal = { kind: "device"; device?: Device } | { kind: "member" } | { kind: "assign"; device: Device } | null;
 const navigation = [{ label: "Inventory", icon: Smartphone }, { label: "Track device", icon: MapPin }, { label: "People", icon: Users }, { label: "Activity", icon: ClipboardList }] as const;
 const emptyDevices: Device[] = [];
 const emptyMembers: Member[] = [];
@@ -122,7 +122,7 @@ export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email
     if (device) {
       setSelectedId(device.id);
       setRecordView(current => current?.device.id === device.id ? { ...current, device } : current);
-      await register.mutate(current => current ? { ...current, devices: current.devices.map(item => item.id === device.id ? device : item) } : current, { revalidate: false });
+      await register.mutate(current => current ? { ...current, devices: current.devices.some(item => item.id === device.id) ? current.devices.map(item => item.id === device.id ? device : item) : [...current.devices, device] } : current, { revalidate: false });
     }
     announce("Saved to register");
     void register.mutate();
@@ -152,6 +152,7 @@ export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email
       <header className="topbar"><div><h1>{view === "Inventory" ? "Device inventory" : view}</h1></div><div className="topbar-actions">
         <a className="button secondary" href={appPath(isLocalInventory() ? "/" : "/?cloud=1")}>Home</a>
         {view !== "Track device" && <button className="icon-button" aria-label="Refresh register" title="Refresh register" disabled={register.isValidating} onClick={() => { void register.mutate(); void audit.mutate(); }}><RefreshCw size={17} /></button>}
+        {view === "Inventory" && <button className="button primary" disabled={!register.data} onClick={() => setModal({ kind: "device" })}><Plus size={17} />Add device</button>}
         {view === "People" && <button className="button primary" disabled={!register.data} onClick={() => setModal({ kind: "member" })}><Plus size={17} />Add person</button>}
       </div></header>
       {isLocalInventory() && <LocalCloudSync />}
@@ -292,16 +293,18 @@ function AuditList({ data, error, loading, showDevice = false, members }: { data
 
 const fields: { key: keyof DeviceInput; label: string; required?: boolean; max: number }[] = [
   { key: "name", label: "Device name", required: true, max: 160 }, { key: "model_name", label: "Model", required: true, max: 120 },
-  { key: "serial_number", label: "Serial number", max: 120 }, { key: "capacity", label: "Capacity", max: 80 },
+  { key: "serial_number", label: "Serial number", required: true, max: 120 }, { key: "capacity", label: "Capacity", max: 80 },
   { key: "ram", label: "RAM", max: 80 },
   { key: "model_number", label: "Model number", max: 120 }, { key: "ios_version", label: "OS version", max: 80 },
   { key: "wifi_address", label: "Wi-Fi address", max: 17 }, { key: "bluetooth_address", label: "Bluetooth address", max: 17 },
+  { key: "imei", label: "IMEI", max: 15 }, { key: "imei2", label: "IMEI 2", max: 15 },
+  { key: "eid", label: "EID", max: 32 }, { key: "upc", label: "UPC", max: 80 },
   { key: "barcode", label: "Barcode / asset code", max: 200 }
 ];
 
 function Editor({ modal, members, onClose, onSaved, returnFocus }: { returnFocus?: HTMLElement | null; modal: Exclude<NonNullable<Modal>, { kind: "assign" }>; members: Member[]; onClose: () => void; onSaved: (device?: Device) => Promise<void> }) {
   const [pending, setPending] = useState(false);
-  const title = modal.kind === "member" ? "Add person" : "Edit device";
+  const title = modal.kind === "member" ? "Add person" : modal.device ? "Edit device" : "Add device";
   const opener = useRef<HTMLElement | null>(null);
   useEffect(() => { opener.current = document.activeElement as HTMLElement; }, []);
   return <Dialog.Root open onOpenChange={open => { if (!open && !pending) onClose(); }}><Dialog.Portal><Dialog.Overlay className="dialog-overlay" /><Dialog.Content className="modal dialog-content" aria-describedby={undefined} onCloseAutoFocus={event => { event.preventDefault(); (returnFocus ?? opener.current)?.focus(); }} onEscapeKeyDown={event => { if (pending) event.preventDefault(); }} onPointerDownOutside={event => event.preventDefault()}>
@@ -333,7 +336,7 @@ function EditorForm({ modal, pending, setPending, onClose, onSaved, focusOnMount
         input.capacity ||= null;
         input.barcode ||= input.serial_number || `EQ-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
         for (const field of fields) if (field.required && !input[field.key]) throw new Error(`${field.label} is required.`);
-        await onSaved(await saveDevice(input, modal.device));
+        await onSaved(modal.device ? await saveDevice(input, modal.device) : await addDevice(input));
       }
     } catch (error) { setError(errorMessage(error)); }
     finally { setPending(false); }

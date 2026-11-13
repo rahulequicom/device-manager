@@ -364,7 +364,7 @@ h3 { font-size: 16px; font-weight: 600; }
 .employee-hero-art { display: grid; place-items: center; width: 210px; height: 190px; color: #5278c7; transform: rotate(9deg); }
 .employee-hero-art span { font-size: 11px; padding: 9px 14px; border-radius: 20px; background: white; box-shadow: 0 6px 24px #223f6412; transform: rotate(-9deg); }
 .employee-hero-art i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #3e9571; margin-right: 6px; }
-.employee-actions { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 40px; }
+.employee-actions { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 16px; margin-bottom: 40px; }
 .employee-actions > button { text-align: left; padding: 24px; border: 1px solid #e0e5ec; border-radius: 16px; background: white; display: grid; grid-template-columns: 1fr auto; gap: 10px; cursor: pointer; color: inherit; }
 .employee-actions > button:hover { border-color: #91a9d0; }
 .employee-actions > button:disabled { opacity: .5; cursor: default; }

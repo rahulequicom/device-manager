@@ -1,3 +1,18 @@
+# Current GitHub Pages deployment
+
+Live employee workspace: https://rahulequicom.github.io/device-manager/
+Admin workspace: https://rahulequicom.github.io/device-manager/admin/
+
+Admins use **Inventory → Add device** for name, model, platform, serial number and optional cellular/network specifications. New devices are available for employee self-assignment. Required identity fields are name, model, platform and serial number; IMEI is optional for non-cellular devices.
+
+Employees see device names, availability and current holders. They can assign an available device to themselves and transfer their own device to an approved employee. They cannot register devices or retrieve specifications through device, transfer or activity APIs. Assignment and transfer events retain timestamps in the admin dashboard.
+
+Apply `supabase/migrations/202610140012_private_specs_self_assignment.sql` after migration 011. It also requires admin authentication for the legacy mobile inventory read endpoint, which previously exposed serial numbers and IMEIs anonymously. Older anonymous mobile inventory downloads will require an authenticated admin client. Local development preview remains a deliberately separate admin sandbox.
+
+The workflow in `.github/workflows/pages.yml` deploys the static export under `/device-manager`.
+
+---
+
 # Web dashboard deployment
 
 Live URL: https://device-register-admin.equicomtech-7713.chatgpt.site

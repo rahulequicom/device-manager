@@ -33,9 +33,11 @@ test('local inventory is gated and persists edits, assignments and audit', async
     api.acknowledgeLocalChanges([pending.events[0].id]);
     assert.equal(api.pendingLocalChanges().events.length, 1);
     assert.equal(api.localAudit(returned.id).length, 2);
-    const created = api.localAddDevice({ name: "New device", model_name: "Pixel", platform: "Android", serial_number: " local-new ", capacity: null, barcode: "" }, member.id);
+    const created = api.localAddDevice({ name: "New device", model_name: "Pixel", imei: "123456789012345", model_number: "PIXEL-9", platform: "Android", serial_number: " local-new ", capacity: null, barcode: "" }, member.id);
     assert.equal(created.holder_id, member.id);
     assert.equal(created.serial_number, "LOCAL-NEW");
+    assert.equal(created.imei, "123456789012345");
+    assert.equal(created.model_number, "PIXEL-9");
     assert.equal(api.localAudit(created.id)[0].before_data, null);
     assert.throws(() => api.localAddDevice({ name: "Duplicate", model_name: "Pixel", platform: "Android", serial_number: "LOCAL-NEW", capacity: null, barcode: "" }, member.id), /already registered/);
     globalThis.localStorage.setItem = () => { throw new Error('Storage full'); };

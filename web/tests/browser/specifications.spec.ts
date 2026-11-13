@@ -32,7 +32,7 @@ test("specifications edit, cancel, validation, failed save and persistence", asy
     }
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
-  await page.goto("/admin");
+  await page.goto("/admin?cloud=1");
   await page.getByLabel("Email", { exact: true }).fill(user.email);
   await page.getByLabel("Password", { exact: true }).fill("test-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -65,6 +65,7 @@ test("specifications edit, cancel, validation, failed save and persistence", asy
   expect(saves).toBe(0);
   await expect(specsDialog.getByLabel("Device name", { exact: true })).toBeFocused();
   await specsDialog.getByLabel("Device name", { exact: true }).fill("Redmi A4 5G");
+  await specsDialog.getByLabel("Serial number", { exact: true }).fill("ADMIN-SERIAL");
   failSpecifications = true;
   await specsDialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(specsDialog.getByRole("alert")).toContainText("permission");
@@ -84,7 +85,7 @@ test("specifications edit, cancel, validation, failed save and persistence", asy
   await specsDialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(specs).toBeFocused();
   await page.reload();
-  await page.getByRole("button", { name: "Redmi A4 5G EQ-001", exact: true }).click();
+  await page.getByRole("button", { name: "Redmi A4 5G ADMIN-SERIAL", exact: true }).click();
   await specs.click();
   await expect(specsDialog.locator(".spec-list > div").filter({ hasText: "RAM" })).toContainText("8 GB");
   await expect(specsDialog.locator(".spec-list > div").filter({ hasText: "Capacity" })).toContainText("128 GB");
