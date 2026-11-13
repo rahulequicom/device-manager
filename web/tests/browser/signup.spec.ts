@@ -51,3 +51,26 @@ test('work email signup generates a temporary password, replaces it and opens as
   await expect(page.getByText('Local development preview', { exact: true })).toHaveCount(0);
   expect(activated).toBe(true);
 });
+
+test('an existing admin can replace a temporary password and open the admin dashboard',async ({page})=>{
+  const user={id:'admin-arshad',email:'arshad@example.test'};
+  let changed=false;let employeeActivation=false;
+  await page.route('https://*.supabase.co/**',async route=>{
+    const url=new URL(route.request().url());let body:unknown=[];
+    if(url.pathname.endsWith('/token')) body={access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer',user};
+    else if(url.pathname.endsWith('/user')){if(route.request().method()==='PUT')changed=true;body=user;}
+    else if(url.pathname.endsWith('/dm_admins'))body={user_id:user.id};
+    else if(url.pathname.endsWith('/dm_activate_employee'))employeeActivation=true;
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
+  });
+  await page.goto('/signup');
+  await page.getByRole('button',{name:'Already registered? Continue setup',exact:true}).click();
+  await page.getByLabel('Work email',{exact:true}).fill(user.email);
+  await page.getByLabel('Temporary or existing password',{exact:true}).fill('test-temporary-password');
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
+  await page.getByLabel('New password',{exact:true}).fill('Private-new-password-123!');
+  await page.getByLabel('Confirm password',{exact:true}).fill('Private-new-password-123!');
+  await page.getByRole('button',{name:'Save password and open devices',exact:true}).click();
+  await expect(page).toHaveURL(/\/admin\/?$/);
+  expect(changed).toBe(true);expect(employeeActivation).toBe(false);
+});
