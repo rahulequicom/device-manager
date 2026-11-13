@@ -1,5 +1,5 @@
-import { AdminAccess } from "@/components/admin-access";
+import { EmployeeHome } from "@/components/employee-home";
 
 export default function Home() {
-  return <AdminAccess />;
+  return <EmployeeHome />;
 }

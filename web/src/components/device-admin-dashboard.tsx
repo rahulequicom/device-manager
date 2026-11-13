@@ -1,4 +1,5 @@
 "use client";
+import { appPath } from "@/lib/app-path";
 import { AppSelect } from "./app-select";
 import { DevicePlatformIcon } from "./device-platform-icon";
 import { TrackDevice } from "./track-device";
@@ -11,11 +12,14 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Ellipsis, ClipboardList, FileText, MapPin, Smartphone, Users, Plus, Search, RefreshCw, LogOut, X, Pencil, UserRoundCheck, RotateCcw, Archive, Copy, ChevronLeft, ChevronRight, Layers3, SlidersHorizontal } from "lucide-react";
 import { type Device, type DeviceInput, type Member, type Team, type Platform, deviceStatus, statusOrder, statusTone, teams, platforms, formatDate } from "@/lib/device-data";
 import { addMember, changeDevice, errorMessage, loadAudit, loadRegister, saveDevice } from "@/lib/register-api";
+import { ActivityFeed } from "./activity-feed";
+import { LocalCloudSync } from "./local-cloud-sync";
+import { isLocalInventory } from "@/lib/local-register";
 import { getSupabase } from "@/lib/supabase";
 
-type View = "Inventory" | "Track device" | "People" | "Device history";
+type View = "Inventory" | "Track device" | "People" | "Activity";
 type Modal = { kind: "device"; device: Device } | { kind: "member" } | { kind: "assign"; device: Device } | null;
-const navigation = [{ label: "Inventory", icon: Smartphone }, { label: "Track device", icon: MapPin }, { label: "People", icon: Users }, { label: "Device history", icon: ClipboardList }] as const;
+const navigation = [{ label: "Inventory", icon: Smartphone }, { label: "Track device", icon: MapPin }, { label: "People", icon: Users }, { label: "Activity", icon: ClipboardList }] as const;
 const emptyDevices: Device[] = [];
 const emptyMembers: Member[] = [];
 
@@ -23,6 +27,7 @@ export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email
   const { mutate: mutateCache } = useSWRConfig();
   const register = useSWR("register", loadRegister, { refreshInterval: 30000 });
   useEffect(() => {
+    if (isLocalInventory()) return;
     const client = getSupabase();
     if (!client) return;
     const channel = client.channel("device-register-live")
@@ -103,8 +108,8 @@ export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email
   }, [devices]);
   function clearFilters() { setQuery(""); setStatus("All"); setTeam("All"); setPlatform("All"); setPage(0); }
   const hasFilters = !!query || status !== "All" || team !== "All" || platform !== "All";
-  const audit = useSWR(view === "Device history" ? ["audit", "all"] : selected ? ["audit", selected.id] : null,
-    () => loadAudit(view === "Device history" ? undefined : selected?.id), { refreshInterval: 30000 });
+  const audit = useSWR(view === "Activity" ? ["audit", "all"] : selected ? ["audit", selected.id] : null,
+    () => loadAudit(view === "Activity" ? undefined : selected?.id), { refreshInterval: 30000 });
   const history = audit.data;
 
   function announce(message: string) {
@@ -137,7 +142,7 @@ export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email
 
   return <main className="admin-shell">
     <aside className="sidebar" aria-label="Admin navigation">
-      <a className="brand" href="/"><span className="brand-mark"><Layers3 size={22} strokeWidth={1.6} /></span><span>Device<strong>Management</strong></span></a>
+      <a className="brand" href={appPath("/")}><span className="brand-mark"><Layers3 size={22} strokeWidth={1.6} /></span><span>Device<strong>Management</strong></span></a>
       <div className="nav-section-label">Workspace</div>
       <nav className="nav-list">{navigation.map(({ label, icon: Icon }) => <button key={label} aria-label={label} aria-current={view === label ? "page" : undefined} className={`nav-item ${view === label ? "active" : ""}`} onClick={() => setView(label)}><Icon size={18} strokeWidth={1.7} /><span>{label}</span>{(label === "Inventory" || label === "People") && register.data && <span className="nav-count">{label === "Inventory" ? devices.length : members.length}</span>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="account-panel"><span className="account-avatar">{email.slice(0, 2).toUpperCase()}</span><div><strong>My account</strong><p title={email}>{email}</p></div><button className="icon-button" title="Sign out" aria-label="Sign out" onClick={onSignOut}><LogOut size={17} /></button></div></div>
@@ -145,9 +150,11 @@ export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email
     <section className="workspace">
       <div className="workspace-content">
       <header className="topbar"><div><h1>{view === "Inventory" ? "Device inventory" : view}</h1></div><div className="topbar-actions">
+        <a className="button secondary" href={appPath(isLocalInventory() ? "/" : "/?cloud=1")}>Home</a>
         {view !== "Track device" && <button className="icon-button" aria-label="Refresh register" title="Refresh register" disabled={register.isValidating} onClick={() => { void register.mutate(); void audit.mutate(); }}><RefreshCw size={17} /></button>}
         {view === "People" && <button className="button primary" disabled={!register.data} onClick={() => setModal({ kind: "member" })}><Plus size={17} />Add person</button>}
       </div></header>
+      {isLocalInventory() && <LocalCloudSync />}
       {(register.error || failure || signOutError) && <div className="error-banner" role="alert">{failure || signOutError || errorMessage(register.error)}<button className="button secondary" onClick={() => { setFailure(""); void register.mutate(); }}>Retry</button></div>}
       {register.isLoading ? <div className="loading-state" role="status">Loading your register...</div> : register.data && <>
         {view === "Track device" && <TrackDevice devices={devices} members={members} />}
@@ -205,7 +212,7 @@ export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email
           </div>
         </>}
         {view === "People" && <section className="people-panel"><div className="panel-heading"><h2>Team members</h2><span className="muted">{members.length} people</span></div>{!members.length ? <div className="empty-state"><span className="empty-people-icon"><Users size={36} strokeWidth={1.3} /></span><h3>No people added yet</h3><p>Add the people who will use your devices.</p><button className="button primary" onClick={() => setModal({ kind: "member" })}><Plus size={16} />Add first person</button></div> : <div className="table-scroll"><table className="register-table"><thead><tr><th>Name</th><th>Team</th><th>Role</th><th>Devices held</th></tr></thead><tbody>{members.map(member => <tr key={member.id}><td><div className="table-holder"><span className={`person-avatar team-${member.team.toLowerCase()}`}>{member.name.split(" ").map(part => part[0]).slice(0,2).join("")}</span><strong>{member.name}</strong></div></td><td><span className={`team-label team-${member.team.toLowerCase()}`}>{member.team}</span></td><td>{member.role || "Not recorded"}</td><td>{heldCounts.get(member.id) ?? 0}</td></tr>)}</tbody></table></div>}</section>}
-        {view === "Device history" && <section className="audit-panel"><div className="panel-heading"><h2>All device activity</h2><span className="muted">{history?.length ?? 0} recorded events</span></div><AuditList data={history} error={audit.error} loading={audit.isLoading} showDevice members={members} /></section>}
+        {view === "Activity" && <section className="audit-panel admin-activity"><ActivityFeed data={history} error={audit.error} loading={audit.isLoading} refreshing={audit.isValidating} onRefresh={() => { void audit.mutate(); }} admin members={members} /></section>}
       </>}
       </div>
     </section>

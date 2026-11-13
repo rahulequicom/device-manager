@@ -3,8 +3,8 @@ import { FeedbackToolbar } from "@/components/feedback-toolbar";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Device Management Admin",
-  description: "Admin dashboard for the device management register"
+  title: "Device Management",
+  description: "Employee devices, registration and transfers"
 };
 
 export default function RootLayout({

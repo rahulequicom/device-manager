@@ -21,7 +21,7 @@ test("sign-in, empty inventory, persistence requests, errors, and accessible dia
     }
     await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   });
-  await page.goto("/");
+  await page.goto("/admin?cloud=1");
   await page.getByLabel("Email", { exact: true }).fill("admin@example.test");
   await page.getByLabel("Password", { exact: true }).fill("test-only-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -51,10 +51,10 @@ test("sign-in, empty inventory, persistence requests, errors, and accessible dia
   if (test.info().project.name === "mobile") await page.getByRole("button", { name: "Back to devices", exact: true }).click();
   await page.getByRole("button", { name: "People", exact: true }).click();
   await expect(page.getByText("No people added yet")).toBeVisible();
-  await page.getByRole("button", { name: "Device history", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Device history", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "All device activity", exact: true })).toBeVisible();
-  await expect(page.getByText("No recorded activity yet.")).toBeVisible();
+  await page.getByRole("button", { name: "Activity", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Activity", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "All employee activity", exact: true })).toBeVisible();
+  await expect(page.getByText("No activity yet")).toBeVisible();
   await page.getByRole("button", { name: "Inventory", exact: true }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: `/tmp/device-admin-${test.info().project.name}.png`, fullPage: true });
@@ -66,7 +66,7 @@ test("non-admin accounts cannot open the register", async ({ page }) => {
     const body = url.includes("/token") ? { access_token: "test-access", refresh_token: "test-refresh", expires_in: 3600, token_type: "bearer", user: { id: "other", email: "other@example.test" } } : null;
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
-  await page.goto("/");
+  await page.goto("/admin?cloud=1");
   await page.getByLabel("Email", { exact: true }).fill("other@example.test");
   await page.getByLabel("Password", { exact: true }).fill("test-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

@@ -1,14 +1,23 @@
 "use client";
+import { appPath } from "@/lib/app-path";
 
 import { useEffect, useState, type FormEvent } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { Smartphone, ShieldCheck } from "lucide-react";
 import useSWR, { SWRConfig } from "swr";
+import { isLocalInventory } from "@/lib/local-register";
 import { getSupabase } from "@/lib/supabase";
 import { errorMessage } from "@/lib/register-api";
 import { DeviceAdminDashboard } from "./device-admin-dashboard";
 
 export function AdminAccess() {
+  const [local, setLocal] = useState(false);
+  useEffect(() => { setLocal(isLocalInventory()); }, []);
+  if (local) return <SWRConfig value={{ provider: () => new Map() }}><DeviceAdminDashboard email="Local inventory (this browser)" onSignOut={async () => { window.location.reload(); }} signOutError="" /></SWRConfig>;
+  return <RemoteAccess />;
+}
+
+function RemoteAccess() {
   const [client] = useState(getSupabase);
   if (!client) return <AccessFrame title="Connection pending"><p>The device register is waiting for its Supabase connection.</p><p className="muted">No inventory has been loaded.</p></AccessFrame>;
   return <ConnectedAccess client={client} />;
@@ -56,7 +65,7 @@ function AuthorizedAdmin({ client, session }: { client: SupabaseClient; session:
   return <DeviceAdminDashboard email={session.user.email ?? "Admin"} onSignOut={signOut} signOutError={signOutError} />;
 }
 
-function SignIn({ client, initialError }: { client: SupabaseClient; initialError: string }) {
+export function SignIn({ client, initialError }: { client: SupabaseClient; initialError: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(initialError);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -77,6 +86,7 @@ function SignIn({ client, initialError }: { client: SupabaseClient; initialError
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="button primary" disabled={pending}><ShieldCheck size={17} />{pending ? "Signing in..." : "Sign in"}</button>
     </form>
+    <p className="muted">New employee? <a href={appPath("/signup")}>Create your account</a></p>
   </AccessFrame>;
 }
 

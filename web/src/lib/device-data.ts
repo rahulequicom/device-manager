@@ -31,7 +31,7 @@ export type Device = {
   availability_confirmed?: boolean;
 };
 export type DeviceInput = Pick<Device, "name" | "model_name" | "model_number" | "serial_number" | "ios_version" | "capacity" | "wifi_address" | "bluetooth_address" | "barcode" | "ram" | "allocation_team" | "availability_confirmed"> & { platform: Platform; holder_id?: string | null };
-export type AuditEvent = { id: string; device_id: string; device_name: string; action: string; actor: string; created_at: string; before_data: { holder_id?: string | null } | null; after_data: { holder_id?: string | null } };
+export type AuditEvent = { id: string; device_id: string; device_name: string; action: string; actor: string; created_at: string; before_data: Partial<Device> | null; after_data: Partial<Device> };
 export function deviceStatus(device: Device): DeviceStatus {
   if (device.retired) return "Retiring";
   if (device.holder_id) return "Assigned";

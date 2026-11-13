@@ -32,7 +32,7 @@ test("specifications edit, cancel, validation, failed save and persistence", asy
     }
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
-  await page.goto("/");
+  await page.goto("/admin");
   await page.getByLabel("Email", { exact: true }).fill(user.email);
   await page.getByLabel("Password", { exact: true }).fill("test-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

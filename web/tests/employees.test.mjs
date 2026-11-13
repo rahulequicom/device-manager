@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { PGlite } from '@electric-sql/pglite';
+
+test('approved employees see only their devices, register for themselves and transfer only their own devices', async () => {
+  const db = new PGlite();
+  const alice = '10000000-0000-4000-8000-000000000001';
+  const bob = '10000000-0000-4000-8000-000000000002';
+  const outsider = '10000000-0000-4000-8000-000000000003';
+  const admin = '10000000-0000-4000-8000-000000000004';
+  try {
+    await db.exec(`create role anon; create role authenticated; create schema auth;
+      create table auth.users(id uuid primary key, email text);
+      create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+      grant usage on schema public, auth to authenticated, anon;
+      insert into auth.users values ('${alice}','alice@example.test'),('${bob}','bob@example.test'),('${outsider}','outsider@example.test'),('${admin}','admin@example.test');`);
+    for (const file of ['202610140001_device_register.sql','202610140003_ship_inventory.sql','202610140008_employee_portal.sql']) await db.exec(await readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url),'utf8'));
+    const a = (await db.query("insert into dm_members(name,team) values ('Alice','QA') returning id")).rows[0].id;
+    const b = (await db.query("insert into dm_members(name,team) values ('Bob','Mobile') returning id")).rows[0].id;
+    await db.query('insert into dm_employees(user_id,member_id) values ($1,$2),($3,$4)', [alice,a,bob,b]);
+    await db.query('insert into dm_admins(user_id) values ($1)', [admin]);
+    await db.exec('set role anon');
+    await assert.rejects(db.query('select * from dm_devices'), /permission denied/);
+    await assert.rejects(db.query("select dm_employee_add_device('{}')"), /permission denied/);
+    await db.exec('reset role; set role authenticated');
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[outsider]);
+    assert.equal((await db.query('select * from dm_devices')).rows.length,0);
+    await assert.rejects(db.query('select * from dm_employee_directory()'), /Employee access required/);
+    await assert.rejects(db.query("select dm_employee_add_device('{}')"), /Employee access required/);
+    await assert.rejects(db.query('insert into dm_employees(user_id,member_id) values ($1,$2)',[outsider,a]), /permission denied/);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[alice]);
+    const payload = { name:'My phone', model_name:'Pixel', platform:'Android', barcode:'EMP-1', holder_id:b, retired:true };
+    const device = (await db.query('select * from dm_employee_add_device($1::jsonb)',[JSON.stringify(payload)])).rows[0];
+    assert.equal(device.holder_id,a); assert.equal(device.retired,false);
+    assert.equal((await db.query('select * from dm_devices')).rows.length,1);
+    assert.equal((await db.query('select * from dm_employee_directory()')).rows.length,2);
+    assert.equal((await db.query("update dm_devices set name='Hacked' where id=$1 returning id",[device.id])).rows.length,0);
+    await assert.rejects(db.query('select dm_employee_transfer($1,$2,$3)',[device.id,b,99]), /changed/);
+    await assert.rejects(db.query('select dm_employee_transfer($1,$2,$3)',[device.id,a,device.version]), /another approved/);
+    await db.query('select dm_employee_transfer($1,$2,$3)',[device.id,b,device.version]);
+    assert.equal((await db.query('select * from dm_devices')).rows.length,0);
+    await assert.rejects(db.query('select dm_employee_transfer($1,$2,$3)',[device.id,b,device.version]), /changed/);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[bob]);
+    assert.equal((await db.query('select * from dm_devices')).rows[0].holder_id,b);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);
+    assert.equal((await db.query('select * from dm_devices')).rows.length,13);
+    assert.equal((await db.query('select * from dm_audit_events where device_id=$1',[device.id])).rows.length,2);
+  } finally { await db.close(); }
+});
