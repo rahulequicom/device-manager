@@ -49,7 +49,7 @@ Changes made elsewhere remain in Supabase and are not pulled into this local reg
 
 Apply Supabase migration `202610140008_employee_portal.sql` and link employee accounts using `../supabase/grant-employee.sql`. See `../supabase/README.md`. Local previews retain the existing inventory and offer a **Preview as** employee selector using the people records created in `/admin`. New local registrations participate in admin cloud sync after migration 008 is applied.
 
-`/signup` is employee registration: generated temporary password, email verification, replacement password, then approved-email activation. Use `http://localhost:3000/signup` locally. The authenticated employee home is `/?cloud=1`, which opts out of the local development preview so employee sessions use Supabase and database RLS. Existing browser-only local records remain intact. Signup requires migration 009, an approved email mapping, and custom SMTP for employee email delivery; see `../supabase/README.md`.
+`/signup` lets employees choose a six-digit numeric password and verify their approved work email. It generates no temporary passwords. Password reset uses the same six-digit form policy; existing login passwords remain accepted until their owners change them. Exact numeric formatting is validated by the app; Supabase Auth also enforces its server password requirements. Use `http://localhost:3000/signup` locally. The authenticated employee home is `/?cloud=1`, which opts out of the local development preview. Signup requires migration 009, an approved email mapping, and custom SMTP for employee email delivery; see `../supabase/README.md`.
 
 ## GitHub Pages
 
@@ -59,4 +59,4 @@ Apply Supabase migration `202610140008_employee_portal.sql` and link employee ac
 
 In the admin workspace, **Activity** shows events for all employees and devices, with historical handover details, asset/serial, actor, and timestamps including seconds in IST. The employee filter matches either holder in a handover. Search matches employees, devices, actors, asset codes, and serials. The existing admin audit read policy supplies all records; employee activity stays restricted by RLS.
 
-Existing admins can replace a temporary password at `/signup`: choose **Already registered? Continue setup**, sign in, and set a new password. The page checks the existing `dm_admins` membership and returns admins to `/admin` without employee activation. Password replacement is an onboarding UI flow, not a server-enforced expiring-password policy.
+Existing admins can sign in at `/signup` using **Already registered? Sign in**, then **Continue to workspace**. The page checks `dm_admins` and opens `/admin` without employee activation or password replacement. **Forgot your password?** starts the email recovery flow.

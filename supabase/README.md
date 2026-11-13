@@ -36,11 +36,11 @@ The home page `/` shows employees only devices assigned to their linked member r
 
 Migration 008 adds read RLS and narrow registration/transfer RPCs without changing existing mobile intake/snapshot behavior. It also grants admins permission to preserve local device/member UUIDs on sync through the existing admin insert policies. The localhost development bypass remains an explicitly labeled preview, with a selector for checking each person's view. It is not employee authentication.
 
-## Work-email signup and temporary passwords
+## Work-email signup and chosen passwords
 
 Migration `202610140009_employee_signup.sql` adds a private email-to-member allowlist and `dm_activate_employee()`. Only a verified Auth email matching an approved row can activate membership; names or client metadata cannot select a member. `setup-employee-signup.sql` contains the seven explicitly approved work emails and adds Yajna, Priyadarshini, and Raghu to QA. Apply both after 008.
 
-Employees open `/signup`, register their work email, save the per-account temporary password shown once, verify the email, and create their own password. Temporary passwords are generated in the browser using Web Crypto and never saved in browser storage or logs. The normal UI replaces the password before activating access. This is an onboarding flow, not an Auth-server-enforced temporary-password expiry policy. Existing accounts can use the setup link/password recovery flow without overwriting their account on signup.
+Employees open `/signup`, choose their own six-digit numeric password, verify their work email, and continue to their workspace. The app does not generate or display temporary passwords. New-password and recovery forms preserve leading zeros and require exactly six ASCII digits; existing login passwords stay valid until changed. Passwords are sent directly to Supabase Auth, never saved by the app in browser storage or logs. Exact numeric formatting is an application-level validation; the Auth service enforces its own password policy too.
 
 Configure custom SMTP in Supabase Authentication → Emails → SMTP Settings before employee rollout. The default Supabase sender restricts recipient addresses to organization team members. Keep email confirmation enabled. Allow `http://localhost:3000/signup` (or `http://localhost:3000/**`) as an Auth redirect for this local setup. The signup page canonicalizes 127.0.0.1 callback URLs to localhost to match the existing project allowlist. Production requires its own hosted signup URL and redirect allowlist; localhost links work only on the machine running the app. Do not change a shared project's Site URL for this app.
 

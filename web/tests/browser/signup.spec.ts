@@ -1,58 +1,47 @@
 import { test, expect } from '@playwright/test';
 
-test('work email signup generates a temporary password, replaces it and opens assigned cloud devices', async ({ page }) => {
-  const employeeId = '10000000-0000-4000-8000-000000000001';
-  const user = { id: '20000000-0000-4000-8000-000000000001', email: 'bhumika@equicomtech.com', aud: 'authenticated', role: 'authenticated', email_confirmed_at: new Date().toISOString(), app_metadata: {}, user_metadata: {}, identities: [{ provider: 'email' }], created_at: new Date().toISOString() };
-  let temporary = ''; let replacement = ''; let activated = false;
-  await page.route('https://*.supabase.co/**', async route => {
-    const url = new URL(route.request().url());
-    let body: unknown = [];
-    if (url.pathname.endsWith('/signup')) {
-      const input = route.request().postDataJSON();
-      temporary = input.password;
-      expect(input.email).toBe(user.email);
-      expect(url.searchParams.get('redirect_to')).toBe('http://localhost:3000/signup');
-      body = { ...user, email_confirmed_at: null };
-    } else if (url.pathname.endsWith('/token')) {
-      expect(route.request().postDataJSON().password).toBe(temporary);
-      body = { access_token: 'test-access', refresh_token: 'test-refresh', expires_in: 3600, token_type: 'bearer', user };
-    } else if (url.pathname.endsWith('/user')) {
-      if (route.request().method() === 'PUT') replacement = route.request().postDataJSON().password;
-      body = user;
-    } else if (url.pathname.endsWith('/dm_activate_employee')) {
-      expect(replacement).toBe('New-private-password-123!');
-      expect(replacement).not.toBe(temporary); activated = true; body = employeeId;
-    } else if (url.pathname.endsWith('/dm_admins')) body = null;
-    else if (url.pathname.endsWith('/dm_employees')) body = { member_id: employeeId };
-    else if (url.pathname.endsWith('/dm_employee_directory')) body = [{ id: employeeId, name: 'Bhumika', team: 'QA', role: '' }];
-    else if (url.pathname.endsWith('/dm_devices')) body = [{ id: 'cloud-device', name: 'My cloud phone', model_name: 'Pixel', platform: 'Android', holder_id: employeeId, barcode: 'CLOUD-1', retired: false, version: 1 }];
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+test('signup uses the chosen password and verified employees open their devices without password replacement', async ({ page }) => {
+  const memberId='10000000-0000-4000-8000-000000000001';
+  const user={id:'20000000-0000-4000-8000-000000000001',email:'bhumika@equicomtech.com',aud:'authenticated',role:'authenticated',identities:[{provider:'email'}]};
+  let passwordUpdates=0;let activated=false;
+  await page.route('https://*.supabase.co/**',async route=>{
+    const url=new URL(route.request().url());let body:unknown=[];
+    if(url.pathname.endsWith('/signup')){
+      const input=route.request().postDataJSON();expect(input.password).toBe('482915');expect(input.email).toBe(user.email);
+      expect(url.searchParams.get('redirect_to')).toBe('http://localhost:3000/signup');body=user;
+    }else if(url.pathname.endsWith('/token')){
+      expect(route.request().postDataJSON().password).toBe('482915');
+      body={access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer',user};
+    }else if(url.pathname.endsWith('/user')){if(route.request().method()==='PUT')passwordUpdates++;body=user;}
+    else if(url.pathname.endsWith('/dm_admins'))body=null;
+    else if(url.pathname.endsWith('/dm_activate_employee')){activated=true;body=memberId;}
+    else if(url.pathname.endsWith('/dm_employees'))body={member_id:memberId};
+    else if(url.pathname.endsWith('/dm_employee_directory'))body=[{id:memberId,name:'Bhumika',team:'QA',role:''}];
+    else if(url.pathname.endsWith('/dm_devices'))body=[{id:'device',name:'My cloud phone',model_name:'Pixel',platform:'Android',holder_id:memberId,barcode:'EQ-1',retired:false,version:1}];
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
   });
   await page.goto('/signup');
-  await page.getByLabel('Work email', { exact: true }).fill(user.email);
-  await page.getByRole('button', { name: 'Create employee account', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Verify your work email', exact: true })).toBeVisible();
-  expect(temporary.length).toBeGreaterThan(40);
-  await expect(page.getByLabel('Temporary password', { exact: true })).toHaveValue(temporary);
-  expect(await page.evaluate(() => Object.values(localStorage).some(value => value.includes(document.querySelector<HTMLInputElement>('[aria-label="Temporary password"]')!.value)))).toBe(false);
-  await page.getByRole('button', { name: 'Email verified? Continue setup', exact: true }).click();
-  await page.getByLabel('Temporary or existing password', { exact: true }).fill(temporary);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Create your password', exact: true })).toBeVisible();
-  await page.getByLabel('New password', { exact: true }).fill('New-private-password-123!');
-  await page.getByLabel('Confirm password', { exact: true }).fill('Not-the-same-password');
-  await page.getByRole('button', { name: 'Save password and open devices', exact: true }).click();
-  await expect(page.getByText('Passwords do not match.', { exact: true })).toBeVisible();
-  expect(activated).toBe(false);
-  await page.getByLabel('Confirm password', { exact: true }).fill('New-private-password-123!');
-  await page.getByRole('button', { name: 'Save password and open devices', exact: true }).click();
+  await page.getByLabel('Work email',{exact:true}).fill(user.email);
+  await page.getByLabel('Password',{exact:true}).fill('1234');
+  expect(await page.getByLabel('Password',{exact:true}).evaluate((input:HTMLInputElement)=>input.checkValidity())).toBe(false);
+  await page.getByLabel('Password',{exact:true}).fill('482915');
+  await page.getByLabel('Confirm password',{exact:true}).fill('482916');
+  await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await expect(page.getByText('Passwords do not match.',{exact:true})).toBeVisible();
+  await page.getByLabel('Confirm password',{exact:true}).fill('482915');
+  await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Verify your work email',exact:true})).toBeVisible();
+  await expect(page.getByLabel('Temporary password',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Email verified? Sign in',exact:true}).click();
+  await page.getByLabel('Password',{exact:true}).fill('482915');
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.getByRole('button',{name:'Continue to workspace',exact:true}).click();
   await expect(page).toHaveURL(/\?cloud=1$/);
-  await expect(page.getByRole('heading', { name: 'My cloud phone', exact: true })).toBeVisible();
-  await expect(page.getByText('Local development preview', { exact: true })).toHaveCount(0);
-  expect(activated).toBe(true);
+  await expect(page.getByRole('heading',{name:'My cloud phone',exact:true})).toBeVisible();
+  expect(activated).toBe(true);expect(passwordUpdates).toBe(0);
 });
 
-test('an existing admin can replace a temporary password and open the admin dashboard',async ({page})=>{
+test('existing admin signs in with an existing password and opens admin without employee activation',async ({page})=>{
   const user={id:'admin-arshad',email:'arshad@example.test'};
   let changed=false;let employeeActivation=false;
   await page.route('https://*.supabase.co/**',async route=>{
@@ -64,13 +53,11 @@ test('an existing admin can replace a temporary password and open the admin dash
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
   });
   await page.goto('/signup');
-  await page.getByRole('button',{name:'Already registered? Continue setup',exact:true}).click();
+  await page.getByRole('button',{name:'Already registered? Sign in',exact:true}).click();
   await page.getByLabel('Work email',{exact:true}).fill(user.email);
-  await page.getByLabel('Temporary or existing password',{exact:true}).fill('test-temporary-password');
-  await page.getByRole('button',{name:'Continue',exact:true}).click();
-  await page.getByLabel('New password',{exact:true}).fill('Private-new-password-123!');
-  await page.getByLabel('Confirm password',{exact:true}).fill('Private-new-password-123!');
-  await page.getByRole('button',{name:'Save password and open devices',exact:true}).click();
+  await page.getByLabel('Password',{exact:true}).fill('Existing-admin-password');
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.getByRole('button',{name:'Continue to workspace',exact:true}).click();
   await expect(page).toHaveURL(/\/admin\/?$/);
-  expect(changed).toBe(true);expect(employeeActivation).toBe(false);
+  expect(changed).toBe(false);expect(employeeActivation).toBe(false);
 });
