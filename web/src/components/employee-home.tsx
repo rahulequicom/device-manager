@@ -11,11 +11,12 @@ import { isLocalInventory } from "@/lib/local-register";
 import { errorMessage } from "@/lib/register-api";
 import { loadEmployeeRegister, selfAssignEmployeeDevice, transferEmployeeDevice } from "@/lib/employee-api";
 import { type EmployeeDevice, type Member, deviceStatus } from "@/lib/device-data";
+import { EmployeeSetup } from "./employee-setup";
 import { EmployeeActivity } from "./employee-activity";
 import { LocalCloudSync } from "./local-cloud-sync";
 import { SignIn } from "./admin-access";
 
-type Access = { admin: boolean; memberId: string | null; email: string; local: boolean };
+type Access = { admin: boolean; memberId: string | null; email: string; local: boolean; profileComplete?: boolean };
 export function EmployeeHome() {
   const [local, setLocal] = useState<boolean | null>(null);
   useEffect(() => setLocal(isLocalInventory()), []);
@@ -47,12 +48,12 @@ function ApprovedEmployee({ client, user }: { client: SupabaseClient; user: { id
     const admin = await client.from("dm_admins").select("user_id").eq("user_id", user.id).maybeSingle();
     if (admin.error) throw admin.error;
     if (admin.data) return { admin: true, memberId: null };
-    const employee = await client.from("dm_employees").select("member_id").eq("user_id", user.id).maybeSingle();
+    const employee = await client.from("dm_employees").select("member_id,profile_completed_at").eq("user_id", user.id).maybeSingle();
     if (employee.error) throw employee.error;
-    if (employee.data) return { admin: false, memberId: employee.data.member_id as string };
+    if (employee.data) return { admin: false, memberId: employee.data.member_id as string, profileComplete: !!employee.data.profile_completed_at };
     const activated = await client.rpc("dm_activate_employee");
     if (activated.error) throw activated.error;
-    return { admin: false, memberId: activated.data as string };
+    return { admin: false, memberId: activated.data as string, profileComplete: false };
   });
   const [failure, setFailure] = useState("");
   async function signOut() { const result = await client.auth.signOut(); if (result.error) setFailure(errorMessage(result.error)); }
@@ -62,6 +63,7 @@ function ApprovedEmployee({ client, user }: { client: SupabaseClient; user: { id
 }
 function HomeWorkspace({ access, onSignOut, signOutError }: { access: Access; onSignOut?: () => Promise<void>; signOutError?: string }) {
   const register = useSWR("employee-register", loadEmployeeRegister, { refreshInterval: 30000 });
+  const [profileComplete, setProfileComplete] = useState(access.profileComplete ?? access.admin);
   const [view, setView] = useState<"devices" | "activity">("devices");
   const [activityRevision, setActivityRevision] = useState(0);
   const [previewMember, setPreviewMember] = useState("");
@@ -87,17 +89,22 @@ function HomeWorkspace({ access, onSignOut, signOutError }: { access: Access; on
     if (modal) setView("activity");
     setActivityRevision(current => current + 1); setModal(null); setNotice(message); await register.mutate();
   }
+  if (!admin && !access.local && !profileComplete) {
+    if (register.error) return <main className="access-page"><p role="alert">{errorMessage(register.error)}</p><button className="button secondary" onClick={() => void register.mutate()}>Retry</button></main>;
+    if (!register.data || !memberId) return <main className="access-page"><p role="status">Loading your setup...</p></main>;
+    return <EmployeeSetup memberId={memberId} person={person} devices={devices} onSignOut={onSignOut} onSaved={async () => { await register.mutate(); setProfileComplete(true); }} />;
+  }
   return <main className="employee-page">
     <header className="employee-nav"><a className="brand" href={appPath(access.local ? "/" : "/?cloud=1")}><span className="brand-mark"><Layers3 size={22} /></span><span>Device<strong>Management</strong></span></a><div><span>{access.email}</span>{access.admin && <a className="button secondary" href={appPath(access.local ? "/admin" : "/admin?cloud=1")}>Admin workspace <ArrowUpRight size={15} /></a>}{onSignOut && <button className="button secondary" onClick={() => void onSignOut()}>Sign out</button>}</div></header>
     <div className="employee-content">
       {signOutError && <p className="form-error" role="alert">{signOutError}</p>}
       {access.local && <><div className="employee-preview"><strong>Local development preview</strong><span>Employee access is checked after sign-in outside this localhost preview.</span><label>Preview as<select aria-label="Preview as" value={previewMember} onChange={event => { setPreviewMember(event.target.value); setModal(null); setView("devices"); }}><option value="">Admin · all devices</option>{members.map(member => <option key={member.id} value={member.id}>{member.name} · employee</option>)}</select></label></div><LocalCloudSync /></>}
-      <section className="employee-hero"><div><p className="eyebrow">{admin ? "Company workspace" : "Employee workspace"}</p><h1>{person ? `Hello, ${person.name.split(" ")[0]}.` : "Your devices, in one place."}</h1><p>{admin ? "Keep track of every device and make the next handover simple." : "Choose an available device, assign it to yourself, or hand your device to a teammate."}</p></div><div className="employee-hero-art" aria-hidden="true"><Smartphone size={76} strokeWidth={1} /><span><i />Connected to your team</span></div></section>
+      <section className="employee-hero"><div><p className="eyebrow">{admin ? "Company workspace" : "Employee workspace"}</p><h1>{person ? `Hello, ${person.name.split("@")[0].split(" ")[0]}.` : "Your devices, in one place."}</h1><p>{admin ? "Keep track of every device and make the next handover simple." : "Choose an available device, assign it to yourself, or hand your device to a teammate."}</p></div><div className="employee-hero-art" aria-hidden="true"><Smartphone size={76} strokeWidth={1} /><span><i />Connected to your team</span></div></section>
       <section className="employee-actions" aria-label="Quick actions"><button onClick={() => { setNotice(""); setView("devices"); document.getElementById("home-devices")?.scrollIntoView({ behavior: "smooth" }); }}><span className="home-action-icon"><Layers3 size={21} /></span><strong>{admin ? "View inventory" : "Devices"}</strong><small>{devices.length} {admin ? "registered devices" : "devices to choose from"}</small><ArrowRight size={18} /></button>{admin && <a className="button secondary" href={appPath(access.local ? "/admin" : "/admin?cloud=1")}>Add device in admin workspace <Plus size={18} /></a>}<button disabled={!devices.some(device => !!device.holder_id && !device.retired && (admin || device.holder_id === memberId))} onClick={() => { setNotice("Choose Transfer on the device you want to hand over."); setView("devices"); document.getElementById("home-devices")?.scrollIntoView({ behavior: "smooth" }); }}><span className="home-action-icon"><ArrowUpRight size={21} /></span><strong>Transfer a device</strong><small>Hand over to another employee</small><ArrowRight size={18} /></button></section>
       {notice && <p className="employee-notice" role="status">{notice}</p>}
       <div className="employee-view-tabs" role="tablist" aria-label="Workspace views"><button id="devices-tab" role="tab" aria-selected={view === "devices"} aria-controls="devices-panel" onClick={() => setView("devices")}>{admin ? "Inventory" : "Devices"}</button><button id="activity-tab" role="tab" aria-selected={view === "activity"} aria-controls="activity-panel" onClick={() => setView("activity")}>Activity</button></div>
       {view === "activity" ? <div id="activity-panel" role="tabpanel" aria-labelledby="activity-tab"><EmployeeActivity memberId={memberId} admin={admin} members={members} revision={activityRevision} /></div> : <div id="devices-panel" role="tabpanel" aria-labelledby="devices-tab"><section id="home-devices" className="home-devices"><div className="home-section-heading"><div><p className="eyebrow">{admin ? "Company inventory" : "Choose a device"}</p><h2>{admin ? "All devices" : "Devices"} <span>{devices.length}</span></h2></div><label className="search-field"><Search size={18} /><span className="sr-only">Search your devices</span><input aria-label="Search your devices" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search device or employee" /></label></div>
-      {register.error ? <div className="error-banner" role="alert">{errorMessage(register.error)}<button className="button secondary" onClick={() => void register.mutate()}>Retry</button></div> : register.isLoading ? <p role="status">Loading devices...</p> : !visible.length ? <div className="home-empty"><Smartphone size={32} /><h3>{query ? "No matching devices" : "No devices assigned yet"}</h3><p>{query ? "Try another device or employee name." : "Your administrator will add devices here."}</p></div> : <div className="home-device-grid">{visible.map(device => <article className="home-device-card" key={device.id}><div className="home-device-top"><span className="home-device-icon"><Smartphone size={28} strokeWidth={1.5} /></span><span className="status-pill neutral">{deviceStatus(device)}</span></div><h3>{device.name}</h3><p>{device.holder_id === memberId ? "Assigned to you" : members.find(member => member.id === device.holder_id)?.name || "Not assigned"}</p>{!admin && !device.holder_id && !device.retired && <button className="button primary" disabled={claiming === device.id || device.availability_confirmed === false} onClick={() => void claim(device)}>{claiming === device.id ? "Assigning..." : "Assign to me"}</button>}{device.holder_id && (admin || device.holder_id === memberId) && <button className="button secondary" disabled={device.retired} onClick={() => { setNotice(""); setModal(device); }}>Transfer <ArrowUpRight size={16} /></button>}</article>)}</div>}
+      {register.error ? <div className="error-banner" role="alert">{errorMessage(register.error)}<button className="button secondary" onClick={() => void register.mutate()}>Retry</button></div> : register.isLoading ? <p role="status">Loading devices...</p> : !visible.length ? <div className="home-empty"><Smartphone size={32} /><h3>{query ? "No matching devices" : "No devices assigned yet"}</h3><p>{query ? "Try another device or employee name." : "Your administrator will add devices here."}</p></div> : <div className="home-device-grid">{visible.map(device => <article className="home-device-card" key={device.id}><div className="home-device-top"><span className="home-device-icon"><Smartphone size={28} strokeWidth={1.5} /></span><span className="status-pill neutral">{deviceStatus(device)}</span></div><h3>{device.name}</h3><p>{device.holder_id === memberId ? "Assigned to you" : members.find(member => member.id === device.holder_id)?.name || "Not assigned"}</p>{!admin && !device.holder_id && !device.retired && <button className="button primary" disabled={claiming === device.id} onClick={() => void claim(device)}>{claiming === device.id ? "Assigning..." : "Assign to me"}</button>}{device.holder_id && (admin || device.holder_id === memberId) && <button className="button secondary" disabled={device.retired} onClick={() => { setNotice(""); setModal(device); }}>Transfer <ArrowUpRight size={16} /></button>}</article>)}</div>}
       </section></div>}<footer className="employee-footer">Device Management <span>{admin ? "Company inventory" : "Choose · Assign to me · Transfer"}</span></footer>
     </div>
     {modal && <HomeDialog mode={modal} members={members} admin={admin} onClose={() => setModal(null)} onSaved={saved} />}

@@ -1,3 +1,9 @@
+## Employee first-login setup (migration 014)
+
+The employee flow is company email + password → select Team, Role and current Mobile → Save and continue. Employees may choose Mobile, QA or Design and a job role; these choices do not confer admin privileges. An unassigned device can be claimed without a separate availability approval. A device held by another employee cannot be taken over. Employees with no device can finish setup and choose one later.
+
+Apply `supabase/migrations/202610140014_employee_setup.sql` before deploying the new UI. The pre-added email list is no longer used for enrollment or transfer recipients. Admins see saved teams, roles and current device holders in the existing People and Inventory views. Specifications remain admin-only. Historical employee/member records are retained for activity attribution when resetting login accounts.
+
 ## Simple company signup (migration 013)
 
 Employee signup asks for company email and a six-digit password, then opens the workspace automatically. Existing sign-ins also enter directly; there is no Continue or email-verification step in the normal flow. Any `@equicomtech.com` account can enroll as an employee. Existing email-to-employee mappings preserve devices and teams; new employees use the email username and an Unassigned team. New accounts never receive admin access or private specifications.

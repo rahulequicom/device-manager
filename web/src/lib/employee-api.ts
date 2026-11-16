@@ -50,9 +50,16 @@ export async function loadEmployeeActivity(memberId: string | null, admin: boole
 export async function selfAssignEmployeeDevice(device: EmployeeDevice, memberId: string | null) {
   if (isLocalInventory()) {
     const current = localRegister().devices.find(row => row.id === device.id);
-    if (!memberId || !current || current.holder_id || current.retired || current.availability_confirmed === false) throw new Error("Device is no longer available.");
+    if (!memberId || !current || current.holder_id || current.retired) throw new Error("Device is no longer available.");
     return localUpdate({ ...current, version: device.version }, { holder_id: memberId });
   }
   const { error } = await database().rpc("dm_employee_self_assign", { p_device_id: device.id, p_version: device.version });
+  if (error) throw error;
+}
+
+export async function saveEmployeeProfile(team: string, role: string, device?: EmployeeDevice) {
+  const { error } = await database().rpc("dm_employee_save_profile", {
+    p_team: team, p_role: role, p_device_id: device?.id ?? null, p_version: device?.version ?? null
+  });
   if (error) throw error;
 }

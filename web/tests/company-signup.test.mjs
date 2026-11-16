@@ -13,7 +13,7 @@ test('company signup enrolls unverified accounts, preserves employee links and c
    grant usage on schema public,auth to anon,authenticated;
    insert into auth.users values ('${ids[0]}','BHUMIKA@equicomtech.com',null),('${ids[1]}','new.person@equicomtech.com',null),('${ids[2]}','outside@example.com',now()),('${ids[3]}','other@equicomtech.com.evil.test',now());`);
   const folder=new URL('../../supabase/migrations/',import.meta.url);
-  for(const file of (await readdir(folder)).filter(x=>x.endsWith('.sql')).sort()) await db.exec(await readFile(new URL(file,folder),'utf8'));
+  for(const file of (await readdir(folder)).filter(x=>x.endsWith('.sql') && x < '202610140014').sort()) await db.exec(await readFile(new URL(file,folder),'utf8'));
   const known=(await db.query("insert into dm_members(name,team) values ('Bhumika','Design') returning id")).rows[0].id;
   const unrelated=(await db.query("insert into dm_members(name,team) values ('new.person','Unassigned') returning id")).rows[0].id;
   await db.query("insert into dm_employee_signup_allowlist values ('bhumika@equicomtech.com',$1)",[known]);

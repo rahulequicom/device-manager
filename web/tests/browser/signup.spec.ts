@@ -15,7 +15,7 @@ test('signup uses only company email and password and opens devices immediately 
     }else if(url.pathname.endsWith('/user')){if(route.request().method()==='PUT')passwordUpdates++;body=user;}
     else if(url.pathname.endsWith('/dm_admins'))body=null;
     else if(url.pathname.endsWith('/dm_activate_employee')){activated=true;body=memberId;}
-    else if(url.pathname.endsWith('/dm_employees'))body={member_id:memberId};
+    else if(url.pathname.endsWith('/dm_employees'))body={member_id:memberId,profile_completed_at:'2026-11-16T00:00:00Z'};
     else if(url.pathname.endsWith('/dm_employee_directory'))body=[{id:memberId,name:'Bhumika',team:'QA',role:''}];
     else if(url.pathname.endsWith('/dm_employee_catalog'))body=[{id:'device',name:'My cloud phone',model_name:'Pixel',platform:'Android',holder_id:memberId,barcode:'EQ-1',retired:false,version:1}];
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});

@@ -1,0 +1,51 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile,readdir} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+
+test('employee setup saves team, role and own mobile atomically without pre-added emails or admin privileges',async()=>{
+ const db=new PGlite();
+ const alice='10000000-0000-4000-8000-000000000001',bob='10000000-0000-4000-8000-000000000002',admin='10000000-0000-4000-8000-000000000003';
+ try{
+  await db.exec(`create role anon;create role authenticated;create schema auth;
+   create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);
+   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+   grant usage on schema public,auth to anon,authenticated;
+   insert into auth.users values ('${alice}','alice@equicomtech.com',null),('${bob}','bob@equicomtech.com',null),('${admin}','admin@equicomtech.com',now());`);
+  const folder=new URL('../../supabase/migrations/',import.meta.url);
+  for(const file of (await readdir(folder)).filter(x=>x.endsWith('.sql')).sort())await db.exec(await readFile(new URL(file,folder),'utf8'));
+  const unrelated=(await db.query("insert into dm_members(name,team) values ('alice@equicomtech.com','QA') returning id")).rows[0].id;
+  await db.query("insert into dm_employee_signup_allowlist values ('alice@equicomtech.com',$1)",[unrelated]);
+  await db.query('insert into dm_admins(user_id) values ($1)',[admin]);
+  const device=(await db.query("select * from dm_devices where not availability_confirmed limit 1")).rows[0];
+  await db.exec('set role authenticated');
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[alice]);
+  const a=(await db.query('select dm_activate_employee() as id')).rows[0].id;
+  assert.notEqual(a,unrelated);
+  assert.equal((await db.query('select * from dm_employee_directory()')).rows.length,1);
+  await assert.rejects(db.query('select dm_employee_save_profile($1,$2,null,null)',['Other','Developer']),/Choose your team/);
+  await assert.rejects(db.query('select dm_employee_save_profile($1,$2,null,null)',['QA','Admin']),/Choose your role/);
+  await db.query('select dm_employee_save_profile($1,$2,$3,$4)',['QA','QA Tester',device.id,device.version]);
+  assert.ok((await db.query('select profile_completed_at from dm_employees')).rows[0].profile_completed_at);
+  const own=(await db.query('select * from dm_employee_directory()')).rows[0];
+  assert.equal(own.team,'QA');assert.equal(own.role,'QA Tester');assert.equal(own.id,a);
+  assert.equal((await db.query('select * from dm_admins')).rows.length,0);
+  const catalog=(await db.query('select * from dm_employee_catalog()')).rows;
+  assert.equal(catalog.find(d=>d.id===device.id).holder_id,a);
+  assert.equal((await db.query('select * from dm_devices')).rows.length,0);
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[bob]);
+  const b=(await db.query('select dm_activate_employee() as id')).rows[0].id;
+  await assert.rejects(db.query('select dm_employee_save_profile($1,$2,$3,$4)',['Design','Designer',device.id,device.version]),/no longer available/);
+  assert.equal((await db.query('select profile_completed_at from dm_employees')).rows[0].profile_completed_at,null);
+  const unchanged=(await db.query('select * from dm_employee_directory()')).rows.find(m=>m.id===b);
+  assert.equal(unchanged.team,'Unassigned');assert.equal(unchanged.role,'');
+  await db.query('select dm_employee_save_profile($1,$2,null,null)',['Design','Designer']);
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[alice]);
+  await assert.rejects(db.query('select dm_employee_transfer($1,$2,$3)',[device.id,unrelated,device.version+1]),/created an account/);
+  await db.query('select dm_employee_transfer($1,$2,$3)',[device.id,b,device.version+1]);
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);
+  assert.equal((await db.query('select holder_id from dm_devices where id=$1',[device.id])).rows[0].holder_id,b);
+  assert.equal((await db.query('select role from dm_members where id=$1',[b])).rows[0].role,'Designer');
+  assert.match((await db.query('select action from dm_audit_events where device_id=$1 order by created_at desc,id limit 1',[device.id])).rows[0].action,/Transferred/);
+ }finally{await db.close();}
+});

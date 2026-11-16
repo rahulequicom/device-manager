@@ -64,7 +64,7 @@ test('cloud employee uses safe catalog and action RPCs without reading specifica
     expect(url.pathname).not.toMatch(/\/dm_devices$|\/dm_audit_events$/);
     if(url.pathname.endsWith('/token')) body={access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer',user};
     else if(url.pathname.endsWith('/user')) body=user;
-    else if(url.pathname.endsWith('/dm_employees')) body={member_id:'alice'};
+    else if(url.pathname.endsWith('/dm_employees')) body={member_id:'alice',profile_completed_at:'2026-11-16T00:00:00Z'};
     else if(url.pathname.endsWith('/dm_employee_directory')) body=[{id:'alice',name:'Alice',team:'QA',role:''},{id:'bob',name:'Bob',team:'QA',role:''}];
     else if(url.pathname.endsWith('/dm_employee_catalog')) body=devices;
     else if(url.pathname.endsWith('/dm_employee_self_assign')) {
