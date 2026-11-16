@@ -51,7 +51,7 @@ test('transfer explains an empty recipient list and disables confirmation', asyn
   await page.reload();
   await page.getByLabel('Preview as', { exact: true }).selectOption('solo');
   await page.locator('.home-device-card').first().getByRole('button', { name: 'Transfer', exact: true }).click();
-  await expect(page.getByText(/No other approved employees are available/)).toBeVisible();
+  await expect(page.getByText(/No other employees are available/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Confirm transfer', exact: true })).toBeDisabled();
 });
 

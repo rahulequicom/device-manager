@@ -4,7 +4,7 @@ export type DeviceStatus = "Assigned" | "Available" | "Retiring" | "Not confirme
 export const statusOrder: DeviceStatus[] = ["Assigned", "Available", "Retiring"];
 export const platforms = ["iOS", "Android"] as const;
 export type Platform = (typeof platforms)[number];
-export type Member = { id: string; name: string; team: Team; role: string };
+export type Member = { id: string; name: string; team: Team | "Unassigned"; role: string };
 export type Device = {
   id: string;
   name: string;

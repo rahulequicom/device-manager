@@ -1,3 +1,9 @@
+## Simple company signup (migration 013)
+
+Employee signup asks for company email and a six-digit password, then opens the workspace automatically. Existing sign-ins also enter directly; there is no Continue or email-verification step in the normal flow. Any `@equicomtech.com` account can enroll as an employee. Existing email-to-employee mappings preserve devices and teams; new employees use the email username and an Unassigned team. New accounts never receive admin access or private specifications.
+
+Before deploying this flow, the Supabase project owner must turn off **Authentication → Sign In / Providers → Confirm email** and save. This is a project-wide setting, including other applications sharing this project. Apply `supabase/migrations/202610140013_simple_company_signup.sql` after 012. The enrollment RPC deliberately no longer requires email ownership verification. Existing accounts outside the company domain retain their previous access; new outside-domain accounts cannot enroll.
+
 # Current GitHub Pages deployment
 
 Live employee workspace: https://rahulequicom.github.io/device-manager/
