@@ -1,3 +1,13 @@
+## Employee admin delegation (migration 017)
+
+On 16 November 2026, migration 017 was applied to the live Supabase project and the reviewed old `arshad@equicomtech.com` Auth identity was deleted after explicit owner confirmation. The reset reported zero old logins remaining. Recreate Arshad through People → Add person; admin access can then be granted separately.
+
+Apply `supabase/migrations/202610140017_employee_admin_access.sql` after 016 before deploying the web changes. In People, employees with logins have **Grant admin** / **Revoke admin** controls and an access label. Confirmation explains that admin control includes all inventory, private specifications, people management, and delegating access to other employees. All admins have the same full permissions; this is not a restricted manager role.
+
+Only an existing admin can change access. Granting requires an active employee; self changes are blocked so the acting admin remains. Changes are serialized, authorization is rechecked after locking, and changes are recorded in `dm_admin_access_events`. Revocation takes effect through database authorization without changing the employee password or membership. Revoke admin before deactivating or deleting an admin-linked person.
+
+`supabase/reset-arshad-login.sql` is a separate, confirmation-required one-time reset of the reviewed existing Auth identity. It removes that identity and its admin access, aborting if another admin is absent, an employee mapping appears, or related app/storage data exists. It is not part of the deployment migrations. Recreate Arshad as an employee, then grant admin if desired.
+
 ## People activation and deletion (migration 016)
 
 People has **Activate**, **Deactivate**, **Delete**, and **Restore** controls. Deactivation blocks all inventory reads/writes through the employee RPCs immediately while keeping devices assigned for tracking. Activation restores inventory access using the same credentials. Delete removes a person from the default list and blocks inventory access; it is reversible through **Show deleted people → Restore**. Devices must be returned or transferred before deletion. Both actions retain device records, audit history and shared Supabase Auth credentials. Admin-linked profiles are protected.
