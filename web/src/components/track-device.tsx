@@ -1,16 +1,18 @@
 "use client";
+import { useTeams } from "@/lib/teams";
 import "./track-device.css";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Battery, ChevronLeft, ChevronRight, ExternalLink, History, Mail, MapPin, MapPinOff, Pencil, Phone, RefreshCw, Search, X } from "lucide-react";
-import { type Device, type Member, teams, formatDate } from "@/lib/device-data";
+import { type Device, type Member, formatDate } from "@/lib/device-data";
 import { type DemoContact, type TrackedDevice, createTrackingDemo, demoContactStorageKey, mapLinks, readDemoContacts, trackingStatus, trackingStatuses, validateContact } from "@/lib/tracking-demo";
 import { AppSelect } from "./app-select";
 import { DevicePlatformIcon } from "./device-platform-icon";
 
 function reportTime(value?: string | null) { return value ? formatDate(value) : "Not available"; }
 export function TrackDevice({ devices, members }: { devices: Device[]; members: Member[] }) {
+  const { teams } = useTeams();
   const [query, setQuery] = useState("");
   const [team, setTeam] = useState("All");
   const [status, setStatus] = useState("All");

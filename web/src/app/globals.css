@@ -392,3 +392,6 @@ h3 { font-size: 16px; font-weight: 600; }
 .people-panel .panel-heading { flex-wrap: wrap; }
 
 .person-actions small { flex-basis: 100%; }
+
+.team-manager-list { max-height: 35vh; overflow-y: auto; margin: 16px 0; display: grid; gap: 8px; }
+.team-manager-list strong { overflow-wrap: anywhere; }

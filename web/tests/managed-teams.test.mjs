@@ -1,0 +1,52 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile,readdir} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+
+test('managed teams enforce admin writes, accept custom teams and atomically rename people, devices and login requests',async()=>{
+ const db=new PGlite();const admin='10000000-0000-4000-8000-000000000001',employee='10000000-0000-4000-8000-000000000002';
+ try{
+  await db.exec(`create role anon;create role authenticated;create schema auth;
+   create table auth.users(id uuid primary key,email text unique,email_confirmed_at timestamptz,raw_user_meta_data jsonb default '{}');
+   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+   grant usage on schema public,auth to anon,authenticated;
+   insert into auth.users(id,email) values('${admin}','admin@equicomtech.com'),('${employee}','employee@equicomtech.com');`);
+  const folder=new URL('../../supabase/migrations/',import.meta.url);
+  for(const file of (await readdir(folder)).filter(x=>x.endsWith('.sql')).sort())await db.exec(await readFile(new URL(file,folder),'utf8'));
+  await db.query('insert into dm_admins(user_id) values($1)',[admin]);
+  const person=(await db.query("insert into dm_members(name,team,role) values('Employee','QA','Tester') returning id")).rows[0].id;
+  await db.query('insert into dm_employees(user_id,member_id) values($1,$2)',[employee,person]);
+  await db.exec('set role anon');
+  await assert.rejects(db.query("select dm_admin_save_team('Support')"),/permission denied/);
+  await db.exec('reset role;set role authenticated');
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[employee]);
+  assert.equal((await db.query('select * from dm_teams')).rows.length,4);
+  await assert.rejects(db.query("select dm_admin_save_team('Support')"),/Admin access/);
+  await assert.rejects(db.query("insert into dm_teams values('Support')"),/permission denied/);
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);
+  await db.query("select dm_admin_save_team(' Customer Support ')");
+  await assert.rejects(db.query("select dm_admin_save_team('customer support')"),/already exists/);
+  await assert.rejects(db.query("select dm_admin_save_team('All')"),/reserved/);
+  await assert.rejects(db.query("select dm_admin_save_team('Other','Unassigned')"),/reserved/);
+  await assert.rejects(db.query("select dm_admin_save_team('')"),/1–60/);
+  const token=(await db.query("select dm_prepare_employee_login('incoming@equicomtech.com','Incoming','Customer Support','Lead',null) token")).rows[0].token;
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[employee]);
+  await db.query("select dm_employee_save_profile('Customer Support','Other')");
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);
+  const device=(await db.query('select id from dm_devices order by id limit 1')).rows[0].id;
+  await db.query("update dm_devices set allocation_team='Customer Support' where id=$1",[device]);
+  const auditCount=(await db.query('select count(*)::int n from dm_audit_events')).rows[0].n;
+  await db.query("select dm_admin_save_team('Client Services','Customer Support')");
+  assert.equal((await db.query('select team from dm_members where id=$1',[person])).rows[0].team,'Client Services');
+  assert.equal((await db.query('select allocation_team from dm_devices where id=$1',[device])).rows[0].allocation_team,'Client Services');
+  assert.equal((await db.query('select count(*)::int n from dm_audit_events')).rows[0].n,auditCount+1);
+  await db.exec('reset role');
+  assert.equal((await db.query('select team from dm_employee_login_requests where id=$1',[token])).rows[0].team,'Client Services');
+  await db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3)',['10000000-0000-4000-8000-000000000003','incoming@equicomtech.com',JSON.stringify({dm_employee_login_token:token})]);
+  assert.equal((await db.query("select team from dm_members where name='Incoming'")).rows[0].team,'Client Services');
+  await assert.rejects(db.query("update dm_members set team='Unknown' where id=$1",[person]),/foreign key/);
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);
+  await assert.rejects(db.query("select dm_admin_save_team('QA','Client Services')"),/already exists/);
+  assert.equal((await db.query('select team from dm_members where id=$1',[person])).rows[0].team,'Client Services');
+ }finally{await db.close();}
+});

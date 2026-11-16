@@ -1,6 +1,7 @@
 "use client";
+import { useTeams } from "@/lib/teams";
 import { useState, type FormEvent } from "react";
-import { teams, type EmployeeDevice, type Member } from "@/lib/device-data";
+import { type EmployeeDevice, type Member } from "@/lib/device-data";
 import { saveEmployeeProfile } from "@/lib/employee-api";
 import { errorMessage } from "@/lib/register-api";
 
@@ -9,6 +10,7 @@ export function EmployeeSetup({ memberId, person, devices, onSaved, onSignOut }:
   memberId: string; person: Member | undefined; devices: EmployeeDevice[];
   onSaved: () => Promise<void>; onSignOut?: () => Promise<void>;
 }) {
+  const { teams } = useTeams();
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState("");
   const choices = devices.filter(device => !device.retired && (!device.holder_id || device.holder_id === memberId));

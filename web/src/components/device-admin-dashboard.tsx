@@ -1,5 +1,7 @@
 "use client";
 import { appPath } from "@/lib/app-path";
+import { useTeams } from "@/lib/teams";
+import { TeamManager } from "./team-manager";
 import { AppSelect } from "./app-select";
 import { DevicePlatformIcon } from "./device-platform-icon";
 import { TrackDevice } from "./track-device";
@@ -10,7 +12,7 @@ import { AssignmentDialog } from "./assignment-dialog";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Ellipsis, ClipboardList, FileText, MapPin, Smartphone, Users, Plus, Search, RefreshCw, LogOut, X, Pencil, UserRoundCheck, RotateCcw, Archive, Copy, ChevronLeft, ChevronRight, Layers3, SlidersHorizontal } from "lucide-react";
-import { type Device, type DeviceInput, type Member, type Team, type Platform, deviceStatus, statusOrder, statusTone, teams, platforms, formatDate } from "@/lib/device-data";
+import { type Device, type DeviceInput, type Member, type Team, type Platform, deviceStatus, statusOrder, statusTone, platforms, formatDate } from "@/lib/device-data";
 import { addDevice, addMember, changeDevice, errorMessage, loadAudit, loadRegister, saveDevice } from "@/lib/register-api";
 import { createEmployeeLogin } from "@/lib/admin-employees";
 import { PersonActions } from "./person-actions";
@@ -26,6 +28,7 @@ const emptyDevices: Device[] = [];
 const emptyMembers: Member[] = [];
 
 export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email: string; onSignOut: () => Promise<void>; signOutError: string }) {
+  const { teams } = useTeams();
   const { mutate: mutateCache } = useSWRConfig();
   const register = useSWR("register", loadRegister, { refreshInterval: 30000 });
   useEffect(() => {
@@ -217,7 +220,7 @@ export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email
             </DeviceDetailsSurface>}
           </div>
         </>}
-        {view === "People" && <section className="people-panel"><div className="panel-heading"><h2>Team members</h2><label className="people-deleted-toggle"><input type="checkbox" checked={showDeletedPeople} onChange={event => setShowDeletedPeople(event.target.checked)} />Show deleted people</label><span className="muted">{listedPeople.length} people</span></div>{!listedPeople.length ? <div className="empty-state"><span className="empty-people-icon"><Users size={36} strokeWidth={1.3} /></span><h3>No people added yet</h3><p>Add the people who will use your devices.</p><button className="button primary" onClick={() => setModal({ kind: "member" })}><Plus size={16} />Add first person</button></div> : <div className="table-scroll"><table className="register-table"><thead><tr><th>Name</th><th>Team</th><th>Role</th><th>Devices held</th><th>Login</th><th>Status</th><th>Actions</th></tr></thead><tbody>{listedPeople.map(member => <tr key={member.id}><td><div className="table-holder"><span className={`person-avatar team-${member.team.toLowerCase()}`}>{member.name.split(" ").map(part => part[0]).slice(0,2).join("")}</span><strong>{member.name}</strong></div></td><td><span className={`team-label team-${member.team.toLowerCase()}`}>{member.team}</span></td><td>{member.role || "Not recorded"}</td><td>{heldCounts.get(member.id) ?? 0}</td><td>{isLocalInventory() ? <span className="muted">Local record</span> : register.data?.employeeLogins.find(login => login.member_id === member.id) ? <span>{register.data.employeeLogins.find(login => login.member_id === member.id)?.email}</span> : <button className="button secondary" disabled={member.is_active === false || !!member.deleted_at} onClick={() => setModal({ kind: "member", member })}>Create login</button>}</td><td><span className={`status-pill ${member.deleted_at ? "danger" : member.is_active === false ? "neutral" : "good"}`}>{member.deleted_at ? "Deleted" : member.is_active === false ? "Deactivated" : "Active"}</span></td><td>{!isLocalInventory() && <PersonActions person={member} access={register.data?.employeeAccess.find(access => access.member_id === member.id)} held={heldCounts.get(member.id) ?? 0} onChanged={async () => { await register.mutate(); }} />}</td></tr>)}</tbody></table></div>}</section>}
+        {view === "People" && <section className="people-panel"><div className="panel-heading"><h2>Team members</h2><TeamManager /><label className="people-deleted-toggle"><input type="checkbox" checked={showDeletedPeople} onChange={event => setShowDeletedPeople(event.target.checked)} />Show deleted people</label><span className="muted">{listedPeople.length} people</span></div>{!listedPeople.length ? <div className="empty-state"><span className="empty-people-icon"><Users size={36} strokeWidth={1.3} /></span><h3>No people added yet</h3><p>Add the people who will use your devices.</p><button className="button primary" onClick={() => setModal({ kind: "member" })}><Plus size={16} />Add first person</button></div> : <div className="table-scroll"><table className="register-table"><thead><tr><th>Name</th><th>Team</th><th>Role</th><th>Devices held</th><th>Login</th><th>Status</th><th>Actions</th></tr></thead><tbody>{listedPeople.map(member => <tr key={member.id}><td><div className="table-holder"><span className={`person-avatar team-${member.team.toLowerCase()}`}>{member.name.split(" ").map(part => part[0]).slice(0,2).join("")}</span><strong>{member.name}</strong></div></td><td><span className={`team-label team-${member.team.toLowerCase()}`}>{member.team}</span></td><td>{member.role || "Not recorded"}</td><td>{heldCounts.get(member.id) ?? 0}</td><td>{isLocalInventory() ? <span className="muted">Local record</span> : register.data?.employeeLogins.find(login => login.member_id === member.id) ? <span>{register.data.employeeLogins.find(login => login.member_id === member.id)?.email}</span> : <button className="button secondary" disabled={member.is_active === false || !!member.deleted_at} onClick={() => setModal({ kind: "member", member })}>Create login</button>}</td><td><span className={`status-pill ${member.deleted_at ? "danger" : member.is_active === false ? "neutral" : "good"}`}>{member.deleted_at ? "Deleted" : member.is_active === false ? "Deactivated" : "Active"}</span></td><td>{!isLocalInventory() && <PersonActions person={member} access={register.data?.employeeAccess.find(access => access.member_id === member.id)} held={heldCounts.get(member.id) ?? 0} onChanged={async () => { await register.mutate(); }} />}</td></tr>)}</tbody></table></div>}</section>}
         {view === "Activity" && <section className="audit-panel admin-activity"><ActivityFeed data={history} error={audit.error} loading={audit.isLoading} refreshing={audit.isValidating} onRefresh={() => { void audit.mutate(); }} admin members={members} /></section>}
       </>}
       </div>
@@ -319,8 +322,10 @@ function Editor({ modal, members, onClose, onSaved, returnFocus }: { returnFocus
 }
 
 function EditorForm({ modal, pending, setPending, onClose, onSaved, focusOnMount = false }: { modal: Exclude<NonNullable<Modal>, { kind: "assign" }>; pending: boolean; setPending: (pending: boolean) => void; onClose: () => void; onSaved: (device?: Device, message?: string) => Promise<void>; focusOnMount?: boolean }) {
+  const { teams, data: loadedTeams } = useTeams();
   const [error, setError] = useState("");
-  const [team, setTeam] = useState<Team>(modal.kind === "member" && modal.member && teams.includes(modal.member.team as Team) ? modal.member.team as Team : teams[0]);
+  const [team, setTeam] = useState<Team>(modal.kind === "member" && modal.member && modal.member.team !== "Unassigned" ? modal.member.team as Team : teams[0]);
+  useEffect(() => { if (loadedTeams?.length && !loadedTeams.includes(team)) setTeam(loadedTeams[0]); }, [loadedTeams, team]);
   const formRef = useRef<HTMLFormElement | null>(null);
   useEffect(() => { if (focusOnMount) formRef.current?.querySelector<HTMLElement>('[role="combobox"], input')?.focus(); }, [focusOnMount]);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -355,6 +360,6 @@ function EditorForm({ modal, pending, setPending, onClose, onSaved, focusOnMount
       {modal.kind === "device" && <label>Device team<AppSelect disabled={pending} name="allocation_team" aria-label="Device team" defaultValue={modal.device?.allocation_team ?? ""}><option value="">Not recorded</option>{teams.map(value => <option key={value}>{value}</option>)}</AppSelect></label>}
       {modal.kind === "device" && fields.map(field => <label key={field.key}>{field.label}{!field.required && <span className="optional">Optional</span>}<input aria-label={field.label} name={field.key} defaultValue={String(modal.device?.[field.key] ?? "")} required={field.required} maxLength={field.max} pattern={field.key.endsWith("_address") ? "([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}" : undefined} title={field.key.endsWith("_address") ? "Six hexadecimal pairs separated by colons" : undefined} /></label>)}
       {modal.kind === "member" && <><label>Full name<input aria-label="Full name" name="name" required maxLength={120} defaultValue={modal.member?.name ?? ""} /></label><label>Role<input aria-label="Role" name="role" required={!isLocalInventory()} maxLength={160} defaultValue={modal.member?.role ?? ""} /></label>{!isLocalInventory() && <><label>Work email<input aria-label="Work email" name="email" type="email" autoComplete="off" required placeholder="name@equicomtech.com" /></label><label>Six-digit password<input aria-label="Six-digit password" name="password" type="password" autoComplete="new-password" inputMode="numeric" minLength={6} maxLength={6} pattern="[0-9]{6}" required /></label></>}</>}
-      {modal.kind !== "device" && <label>Team<AppSelect aria-label="Team" disabled={pending} value={team} onValueChange={value => setTeam(value as Team)}>{teams.map(value => <option key={value}>{value}</option>)}</AppSelect></label>}
+      {modal.kind !== "device" && <><label>Team<AppSelect aria-label="Team" disabled={pending} value={team} onValueChange={value => setTeam(value as Team)}>{teams.map(value => <option key={value}>{value}</option>)}</AppSelect></label><TeamManager onSelect={setTeam} /></>}
     </fieldset>{modal.kind === "member" && !isLocalInventory() && <p className="muted">Share the work email and password with the employee after saving.</p>}{error && <p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><button className="button secondary" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="button primary" disabled={pending}>{pending ? "Saving..." : "Save"}</button></div></form>;
 }

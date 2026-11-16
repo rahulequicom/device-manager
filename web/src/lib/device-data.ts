@@ -1,5 +1,5 @@
 export const teams = ["Mobile", "QA", "Design"] as const;
-export type Team = (typeof teams)[number];
+export type Team = string;
 export type DeviceStatus = "Assigned" | "Available" | "Retiring" | "Not confirmed";
 export const statusOrder: DeviceStatus[] = ["Assigned", "Available", "Retiring"];
 export const platforms = ["iOS", "Android"] as const;

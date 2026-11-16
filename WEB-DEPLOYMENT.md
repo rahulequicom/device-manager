@@ -1,3 +1,11 @@
+## Managed teams (migration 018)
+
+Admins can open **Manage teams** from People or the Add person/Create employee login form to add or rename teams. Names are trimmed, case-insensitively unique, and limited to 60 characters; All and Unassigned are reserved. Renaming updates linked people, device allocations and pending employee-login requests atomically. Historical activity snapshots retain their original text. The team list is shared by employee setup, employee creation, device allocation and inventory/tracking filters, with pagination for large lists.
+
+Apply `supabase/migrations/202610140018_managed_teams.sql` after 017 before deploying. It preserves Mobile, QA and Design, replaces fixed team checks with foreign keys, and updates enrollment/profile validation to use the registry. Only admins can add or rename teams; approved employees can read the list. The browser-local development preview retains its default teams. The native mobile app's team selectors are unchanged.
+
+Verified with the database/domain suite and 12 desktop/mobile browser checks, including adding/renaming teams inside Add person without submitting credentials, refreshed filters, employee setup and existing People status actions.
+
 ## Admin assignment from home inventory
 
 Admins can use **Assign** on an unassigned device card on the home page, select an active person, and confirm the assignment. Assigned devices retain **Transfer**. Assignments use the existing admin-only device update policy, current version check, active-holder trigger, and transactional audit history. Assigning a device also confirms its availability, matching the admin dashboard handover flow. No database migration is needed.
