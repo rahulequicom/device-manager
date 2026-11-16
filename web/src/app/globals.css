@@ -386,3 +386,9 @@ h3 { font-size: 16px; font-weight: 600; }
 @media(max-width: 700px) { .activity-entry { flex-wrap: wrap; padding: 20px; gap: 12px; }.activity-detail { flex-basis: calc(100% - 56px); }.activity-entry time { margin-left: 52px; white-space: normal; }.activity-entry time small { text-align: left; }.activity-controls { width: 100%; }.activity-controls .search-field { flex: 1; min-width: 0; } }
 .activity-employee-filter select { min-height: 42px; max-width: 220px; padding: 10px 12px; border: 1px solid #dce3ed; border-radius: 8px; color: #405675; background: white; font: inherit; font-size: 12px; }.admin-activity { padding: 22px; }.admin-activity .home-section-heading { align-items: flex-start; flex-wrap: wrap; }.admin-activity .activity-controls { flex-wrap: wrap; }.admin-activity .activity-controls .search-field { width: 270px; }.admin-activity .activity-entry { padding: 22px; }.admin-activity .activity-timeline { margin-bottom: 8px; }
 @media(max-width: 700px) { .admin-activity { padding: 16px; }.admin-activity .activity-controls .search-field { width: 100%; flex-basis: calc(100% - 50px); }.activity-employee-filter { width: 100%; }.activity-employee-filter select { width: 100%; max-width: none; }.admin-activity .activity-entry { padding: 16px; }.activity-controls { flex-wrap: wrap; } }
+
+.person-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.people-deleted-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.people-panel .panel-heading { flex-wrap: wrap; }
+
+.person-actions small { flex-basis: 100%; }

@@ -28,7 +28,7 @@ test('admin-only login creation links a person atomically, consumes its token an
   await db.exec('reset role;set role authenticated');
   await db.query("select set_config('request.jwt.claim.sub',$1,false)",[outsider]);
   await assert.rejects(db.query("select dm_prepare_employee_login('adnan@equicomtech.com','Adnan','QA','QA Tester',null)"),/Admin access/);
-  await assert.rejects(db.query('select dm_activate_employee()'),/Ask your admin/);
+  await assert.rejects(db.query('select dm_activate_employee()'),/Contact your admin/);
   await assert.rejects(db.query('select * from dm_admin_employee_logins()'),/Admin access/);
   await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);
   await assert.rejects(db.query("select dm_prepare_employee_login('admin@equicomtech.com','Admin','QA','QA Tester',null)"),/already has a login/);

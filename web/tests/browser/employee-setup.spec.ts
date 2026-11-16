@@ -9,7 +9,7 @@ for (const hasMobile of [true,false]) test(`first login selects team and role${h
   const url=new URL(route.request().url());let body:unknown=[];
   if(url.pathname.endsWith('/token')) body={access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer',user};
   else if(url.pathname.endsWith('/user'))body=user;
-  else if(url.pathname.endsWith('/dm_employees'))body={member_id:member.id,profile_completed_at:completed?'2026-11-16T00:00:00Z':null};
+  else if(url.pathname.endsWith('/dm_employee_access'))body={member_id:member.id,profile_completed_at:completed?'2026-11-16T00:00:00Z':null};
   else if(url.pathname.endsWith('/dm_employee_catalog'))body=devices;
   else if(url.pathname.endsWith('/dm_employee_directory'))body=[member,{id:'bob',name:'Bob',team:'QA',role:'Developer'}];
   else if(url.pathname.endsWith('/dm_employee_save_profile')){

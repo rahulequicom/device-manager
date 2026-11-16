@@ -30,3 +30,18 @@ export async function createEmployeeLogin(input: EmployeeLoginInput) {
     await signup.auth.dispose();
   }
 }
+
+export async function setPersonState(memberId: string, action: "activate" | "deactivate" | "delete" | "restore") {
+  const client = getSupabase();
+  if (!client) throw new Error("Supabase is not configured.");
+  const { error } = await client.rpc("dm_admin_set_person_state", { p_member_id: memberId, p_action: action });
+  if (error) throw error;
+}
+
+export type EmployeeAccess = { member_id: string; is_admin: boolean; is_self: boolean };
+export async function setEmployeeAdmin(memberId: string, granted: boolean) {
+  const client = getSupabase();
+  if (!client) throw new Error("Supabase is not configured.");
+  const { error } = await client.rpc("dm_admin_set_employee_admin", { p_member_id: memberId, p_granted: granted });
+  if (error) throw error;
+}

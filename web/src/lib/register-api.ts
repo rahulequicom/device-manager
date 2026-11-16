@@ -1,3 +1,4 @@
+import type { EmployeeAccess } from "./admin-employees";
 import { isLocalInventory, localRegister, localAudit, localUpdate, localAddMember, localAddDevice } from "./local-register";
 import { getSupabase } from "./supabase";
 import type { AuditEvent, Device, DeviceInput, Member } from "./device-data";
@@ -27,18 +28,20 @@ async function allRows<T>(table: string, columns: string, order: string): Promis
   }
 }
 export async function loadRegister() {
-  if (isLocalInventory()) return { ...localRegister(), employeeLogins: [] as { member_id: string; email: string }[] };
+  if (isLocalInventory()) return { ...localRegister(), employeeLogins: [] as { member_id: string; email: string }[], employeeAccess: [] as EmployeeAccess[] };
   const { error: importError } = await database().rpc("dm_import_mobile_scans");
   // Keep the existing dashboard usable until the optional mobile-sync migration
   // has been run in the project's SQL editor.
   if (importError && !["PGRST202", "42883"].includes(importError.code ?? "")) throw importError;
   const [devices, members] = await Promise.all([
     allRows<Device>("dm_devices", "*", "id"),
-    allRows<Member>("dm_members", "id,name,team,role", "id")
+    allRows<Member>("dm_members", "id,name,team,role,is_active,deleted_at", "id")
   ]);
   const logins = await database().rpc("dm_admin_employee_logins");
   if (logins.error) throw logins.error;
-  return { devices, members, employeeLogins: logins.data as { member_id: string; email: string }[] };
+  const access = await database().rpc("dm_admin_employee_access");
+  if (access.error) throw access.error;
+  return { devices, members, employeeAccess: access.data as EmployeeAccess[], employeeLogins: logins.data as { member_id: string; email: string }[] };
 }
 export async function loadAudit(deviceId?: string) {
   if (isLocalInventory()) return localAudit(deviceId);

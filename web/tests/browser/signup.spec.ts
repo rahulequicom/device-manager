@@ -17,7 +17,7 @@ test('employee signs in with admin-created credentials and goes straight to self
    expect(route.request().postDataJSON()).toEqual({email:user.email,password:'012345',gotrue_meta_security:{}});
    body={access_token:'employee-access',refresh_token:'employee-refresh',expires_in:3600,token_type:'bearer',user};
   }else if(url.pathname.endsWith('/user')){if(route.request().method()==='PUT')changes++;body=user;}
-  else if(url.pathname.endsWith('/dm_employees'))body={member_id:'adnan',profile_completed_at:'2026-11-16T00:00:00Z'};
+  else if(url.pathname.endsWith('/dm_employee_access'))body={member_id:'adnan',profile_completed_at:'2026-11-16T00:00:00Z'};
   else if(url.pathname.endsWith('/dm_employee_catalog'))body=[{id:'phone',name:'QA phone',holder_id:null,retired:false,version:1,availability_confirmed:true}];
   else if(url.pathname.endsWith('/dm_employee_directory'))body=[{id:'adnan',name:'Adnan',team:'QA',role:'QA Tester'}];
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});

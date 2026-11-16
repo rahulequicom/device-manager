@@ -1,3 +1,9 @@
+## People activation and deletion (migration 016)
+
+People has **Activate**, **Deactivate**, **Delete**, and **Restore** controls. Deactivation blocks all inventory reads/writes through the employee RPCs immediately while keeping devices assigned for tracking. Activation restores inventory access using the same credentials. Delete removes a person from the default list and blocks inventory access; it is reversible through **Show deleted people → Restore**. Devices must be returned or transferred before deletion. Both actions retain device records, audit history and shared Supabase Auth credentials. Admin-linked profiles are protected.
+
+Apply `supabase/migrations/202610140016_people_status.sql` before deploying. The employee access RPC reports only the caller's status. Central membership checks enforce active/non-deleted status server-side, and assignment triggers prevent transfers or login linking to inactive/deleted people. Local development records do not manage cloud account status.
+
 ## Admin-created employee passwords (migration 015)
 
 Admins use **People → Add person** to enter full name, role, team, company work email, and a six-digit password. **Create login** on an existing person row creates credentials without duplicating the employee. Existing login passwords are never overwritten. The employee signs in with the credentials supplied by the admin, then selects a mobile to self-assign. The admin-entered team and role are already saved; there is no employee signup or password-reset UI.
