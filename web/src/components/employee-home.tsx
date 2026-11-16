@@ -51,14 +51,12 @@ function ApprovedEmployee({ client, user }: { client: SupabaseClient; user: { id
     const employee = await client.from("dm_employees").select("member_id,profile_completed_at").eq("user_id", user.id).maybeSingle();
     if (employee.error) throw employee.error;
     if (employee.data) return { admin: false, memberId: employee.data.member_id as string, profileComplete: !!employee.data.profile_completed_at };
-    const activated = await client.rpc("dm_activate_employee");
-    if (activated.error) throw activated.error;
-    return { admin: false, memberId: activated.data as string, profileComplete: false };
+    return null;
   });
   const [failure, setFailure] = useState("");
   async function signOut() { const result = await client.auth.signOut(); if (result.error) setFailure(errorMessage(result.error)); }
   if (access.isLoading) return <main className="access-page"><p role="status">Checking employee access...</p></main>;
-  if (access.error || !access.data) return <main className="access-page"><section className="access-content"><h1>Employee access required</h1><p><a href={appPath("/signup")}>Complete employee signup</a></p><p>{access.error ? errorMessage(access.error) : "Sign in with your @equicomtech.com email to open your devices."}</p>{failure && <p role="alert">{failure}</p>}<button className="button secondary" onClick={() => void signOut()}>Sign out</button><button className="button secondary" onClick={() => void access.mutate()}>Try again</button></section></main>;
+  if (access.error || !access.data) return <main className="access-page"><section className="access-content"><h1>Employee access required</h1><p>{access.error ? errorMessage(access.error) : "Ask your admin to create your login and share your work email and six-digit password."}</p>{failure && <p role="alert">{failure}</p>}<button className="button secondary" onClick={() => void signOut()}>Sign out</button><button className="button secondary" onClick={() => void access.mutate()}>Try again</button></section></main>;
   return <HomeWorkspace access={{ ...access.data, email: user.email, local: false }} onSignOut={signOut} signOutError={failure} />;
 }
 function HomeWorkspace({ access, onSignOut, signOutError }: { access: Access; onSignOut?: () => Promise<void>; signOutError?: string }) {

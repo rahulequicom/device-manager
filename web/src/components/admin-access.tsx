@@ -1,5 +1,4 @@
 "use client";
-import { appPath } from "@/lib/app-path";
 
 import { useEffect, useState, type FormEvent } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
@@ -86,14 +85,13 @@ export function SignIn({ client, initialError }: { client: SupabaseClient; initi
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="button primary" disabled={pending}><ShieldCheck size={17} />{pending ? "Signing in..." : "Sign in"}</button>
     </form>
-    <p><a href={appPath("/signup?mode=reset")}>Forgot your password?</a></p>
-    <p className="muted">New employee? <a href={appPath("/signup")}>Create your account</a></p>
+    <p className="muted">Employees: use the email and six-digit password provided by your admin.</p>
   </AccessFrame>;
 }
 
 function AccessFrame({ title, children }: { title: string; children: React.ReactNode }) {
   return <main className="access-page"><section className="access-content">
     <div className="brand"><span className="brand-mark"><Smartphone size={22} /></span><span>Device<strong>Management</strong></span></div>
-    <p className="eyebrow">Admin workspace</p><h1>{title}</h1><div className="access-body">{children}</div>
+    <p className="eyebrow">Device workspace</p><h1>{title}</h1><div className="access-body">{children}</div>
   </section></main>;
 }

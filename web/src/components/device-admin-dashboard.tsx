@@ -12,13 +12,14 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Ellipsis, ClipboardList, FileText, MapPin, Smartphone, Users, Plus, Search, RefreshCw, LogOut, X, Pencil, UserRoundCheck, RotateCcw, Archive, Copy, ChevronLeft, ChevronRight, Layers3, SlidersHorizontal } from "lucide-react";
 import { type Device, type DeviceInput, type Member, type Team, type Platform, deviceStatus, statusOrder, statusTone, teams, platforms, formatDate } from "@/lib/device-data";
 import { addDevice, addMember, changeDevice, errorMessage, loadAudit, loadRegister, saveDevice } from "@/lib/register-api";
+import { createEmployeeLogin } from "@/lib/admin-employees";
 import { ActivityFeed } from "./activity-feed";
 import { LocalCloudSync } from "./local-cloud-sync";
 import { isLocalInventory } from "@/lib/local-register";
 import { getSupabase } from "@/lib/supabase";
 
 type View = "Inventory" | "Track device" | "People" | "Activity";
-type Modal = { kind: "device"; device?: Device } | { kind: "member" } | { kind: "assign"; device: Device } | null;
+type Modal = { kind: "device"; device?: Device } | { kind: "member"; member?: Member } | { kind: "assign"; device: Device } | null;
 const navigation = [{ label: "Inventory", icon: Smartphone }, { label: "Track device", icon: MapPin }, { label: "People", icon: Users }, { label: "Activity", icon: ClipboardList }] as const;
 const emptyDevices: Device[] = [];
 const emptyMembers: Member[] = [];
@@ -117,14 +118,14 @@ export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email
     setNotice(message);
     timer.current = setTimeout(() => setNotice(""), 3500);
   }
-  async function recorded(device?: Device) {
+  async function recorded(device?: Device, message = "Saved to register") {
     setModal(null);
     if (device) {
       setSelectedId(device.id);
       setRecordView(current => current?.device.id === device.id ? { ...current, device } : current);
       await register.mutate(current => current ? { ...current, devices: current.devices.some(item => item.id === device.id) ? current.devices.map(item => item.id === device.id ? device : item) : [...current.devices, device] } : current, { revalidate: false });
     }
-    announce("Saved to register");
+    announce(message);
     void register.mutate();
     void mutateCache(key => Array.isArray(key) && key[0] === "audit");
   }
@@ -212,7 +213,7 @@ export function DeviceAdminDashboard({ email, onSignOut, signOutError }: { email
             </DeviceDetailsSurface>}
           </div>
         </>}
-        {view === "People" && <section className="people-panel"><div className="panel-heading"><h2>Team members</h2><span className="muted">{members.length} people</span></div>{!members.length ? <div className="empty-state"><span className="empty-people-icon"><Users size={36} strokeWidth={1.3} /></span><h3>No people added yet</h3><p>Add the people who will use your devices.</p><button className="button primary" onClick={() => setModal({ kind: "member" })}><Plus size={16} />Add first person</button></div> : <div className="table-scroll"><table className="register-table"><thead><tr><th>Name</th><th>Team</th><th>Role</th><th>Devices held</th></tr></thead><tbody>{members.map(member => <tr key={member.id}><td><div className="table-holder"><span className={`person-avatar team-${member.team.toLowerCase()}`}>{member.name.split(" ").map(part => part[0]).slice(0,2).join("")}</span><strong>{member.name}</strong></div></td><td><span className={`team-label team-${member.team.toLowerCase()}`}>{member.team}</span></td><td>{member.role || "Not recorded"}</td><td>{heldCounts.get(member.id) ?? 0}</td></tr>)}</tbody></table></div>}</section>}
+        {view === "People" && <section className="people-panel"><div className="panel-heading"><h2>Team members</h2><span className="muted">{members.length} people</span></div>{!members.length ? <div className="empty-state"><span className="empty-people-icon"><Users size={36} strokeWidth={1.3} /></span><h3>No people added yet</h3><p>Add the people who will use your devices.</p><button className="button primary" onClick={() => setModal({ kind: "member" })}><Plus size={16} />Add first person</button></div> : <div className="table-scroll"><table className="register-table"><thead><tr><th>Name</th><th>Team</th><th>Role</th><th>Devices held</th><th>Login</th></tr></thead><tbody>{members.map(member => <tr key={member.id}><td><div className="table-holder"><span className={`person-avatar team-${member.team.toLowerCase()}`}>{member.name.split(" ").map(part => part[0]).slice(0,2).join("")}</span><strong>{member.name}</strong></div></td><td><span className={`team-label team-${member.team.toLowerCase()}`}>{member.team}</span></td><td>{member.role || "Not recorded"}</td><td>{heldCounts.get(member.id) ?? 0}</td><td>{isLocalInventory() ? <span className="muted">Local record</span> : register.data?.employeeLogins.find(login => login.member_id === member.id) ? <span>{register.data.employeeLogins.find(login => login.member_id === member.id)?.email}</span> : <button className="button secondary" onClick={() => setModal({ kind: "member", member })}>Create login</button>}</td></tr>)}</tbody></table></div>}</section>}
         {view === "Activity" && <section className="audit-panel admin-activity"><ActivityFeed data={history} error={audit.error} loading={audit.isLoading} refreshing={audit.isValidating} onRefresh={() => { void audit.mutate(); }} admin members={members} /></section>}
       </>}
       </div>
@@ -258,7 +259,7 @@ function RecentDeviceHistory({ data, error, loading, members, compact, onViewAll
   </section>;
 }
 
-function DeviceRecordDialog({ view, members, onClose, onSaved }: { view: { kind: "history" | "specifications"; device: Device }; members: Member[]; onClose: () => void; onSaved: (device?: Device) => Promise<void> }) {
+function DeviceRecordDialog({ view, members, onClose, onSaved }: { view: { kind: "history" | "specifications"; device: Device }; members: Member[]; onClose: () => void; onSaved: (device?: Device, message?: string) => Promise<void> }) {
   const { device, kind } = view;
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
@@ -302,9 +303,9 @@ const fields: { key: keyof DeviceInput; label: string; required?: boolean; max: 
   { key: "barcode", label: "Barcode / asset code", max: 200 }
 ];
 
-function Editor({ modal, members, onClose, onSaved, returnFocus }: { returnFocus?: HTMLElement | null; modal: Exclude<NonNullable<Modal>, { kind: "assign" }>; members: Member[]; onClose: () => void; onSaved: (device?: Device) => Promise<void> }) {
+function Editor({ modal, members, onClose, onSaved, returnFocus }: { returnFocus?: HTMLElement | null; modal: Exclude<NonNullable<Modal>, { kind: "assign" }>; members: Member[]; onClose: () => void; onSaved: (device?: Device, message?: string) => Promise<void> }) {
   const [pending, setPending] = useState(false);
-  const title = modal.kind === "member" ? "Add person" : modal.device ? "Edit device" : "Add device";
+  const title = modal.kind === "member" ? modal.member ? "Create employee login" : "Add person" : modal.device ? "Edit device" : "Add device";
   const opener = useRef<HTMLElement | null>(null);
   useEffect(() => { opener.current = document.activeElement as HTMLElement; }, []);
   return <Dialog.Root open onOpenChange={open => { if (!open && !pending) onClose(); }}><Dialog.Portal><Dialog.Overlay className="dialog-overlay" /><Dialog.Content className="modal dialog-content" aria-describedby={undefined} onCloseAutoFocus={event => { event.preventDefault(); (returnFocus ?? opener.current)?.focus(); }} onEscapeKeyDown={event => { if (pending) event.preventDefault(); }} onPointerDownOutside={event => event.preventDefault()}>
@@ -313,9 +314,9 @@ function Editor({ modal, members, onClose, onSaved, returnFocus }: { returnFocus
   </Dialog.Content></Dialog.Portal></Dialog.Root>;
 }
 
-function EditorForm({ modal, pending, setPending, onClose, onSaved, focusOnMount = false }: { modal: Exclude<NonNullable<Modal>, { kind: "assign" }>; pending: boolean; setPending: (pending: boolean) => void; onClose: () => void; onSaved: (device?: Device) => Promise<void>; focusOnMount?: boolean }) {
+function EditorForm({ modal, pending, setPending, onClose, onSaved, focusOnMount = false }: { modal: Exclude<NonNullable<Modal>, { kind: "assign" }>; pending: boolean; setPending: (pending: boolean) => void; onClose: () => void; onSaved: (device?: Device, message?: string) => Promise<void>; focusOnMount?: boolean }) {
   const [error, setError] = useState("");
-  const [team, setTeam] = useState<Team>(teams[0]);
+  const [team, setTeam] = useState<Team>(modal.kind === "member" && modal.member && teams.includes(modal.member.team as Team) ? modal.member.team as Team : teams[0]);
   const formRef = useRef<HTMLFormElement | null>(null);
   useEffect(() => { if (focusOnMount) formRef.current?.querySelector<HTMLElement>('[role="combobox"], input')?.focus(); }, [focusOnMount]);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -324,8 +325,12 @@ function EditorForm({ modal, pending, setPending, onClose, onSaved, focusOnMount
     setPending(true); setError("");
     try {
       if (modal.kind === "member") {
-        await addMember({ name: String(form.get("name")).trim(), team, role: String(form.get("role")).trim() });
-        await onSaved();
+        const person = { name: String(form.get("name") || "").trim(), team, role: String(form.get("role") || "").trim() };
+        if (isLocalInventory()) { await addMember(person); await onSaved(); }
+        else {
+          await createEmployeeLogin({ ...person, email: String(form.get("email") || ""), password: String(form.get("password") || ""), memberId: modal.member?.id });
+          await onSaved(undefined, "Employee login created. Share the work email and the six-digit password you entered.");
+        }
       } else {
         const input = Object.fromEntries(fields.map(field => [field.key, String(form.get(field.key) || "").trim()])) as unknown as DeviceInput;
         const platform = String(form.get("platform"));
@@ -345,7 +350,7 @@ function EditorForm({ modal, pending, setPending, onClose, onSaved, focusOnMount
       {modal.kind === "device" && <label>Platform<AppSelect disabled={pending} name="platform" aria-label="Platform" required defaultValue={modal.device?.platform ?? ""}><option value="" disabled>Select platform</option>{platforms.map(value => <option key={value}>{value}</option>)}</AppSelect></label>}
       {modal.kind === "device" && <label>Device team<AppSelect disabled={pending} name="allocation_team" aria-label="Device team" defaultValue={modal.device?.allocation_team ?? ""}><option value="">Not recorded</option>{teams.map(value => <option key={value}>{value}</option>)}</AppSelect></label>}
       {modal.kind === "device" && fields.map(field => <label key={field.key}>{field.label}{!field.required && <span className="optional">Optional</span>}<input aria-label={field.label} name={field.key} defaultValue={String(modal.device?.[field.key] ?? "")} required={field.required} maxLength={field.max} pattern={field.key.endsWith("_address") ? "([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}" : undefined} title={field.key.endsWith("_address") ? "Six hexadecimal pairs separated by colons" : undefined} /></label>)}
-      {modal.kind === "member" && <><label>Full name<input name="name" required maxLength={120} /></label><label>Role<input name="role" maxLength={160} /></label></>}
+      {modal.kind === "member" && <><label>Full name<input aria-label="Full name" name="name" required maxLength={120} defaultValue={modal.member?.name ?? ""} /></label><label>Role<input aria-label="Role" name="role" required={!isLocalInventory()} maxLength={160} defaultValue={modal.member?.role ?? ""} /></label>{!isLocalInventory() && <><label>Work email<input aria-label="Work email" name="email" type="email" autoComplete="off" required placeholder="name@equicomtech.com" /></label><label>Six-digit password<input aria-label="Six-digit password" name="password" type="password" autoComplete="new-password" inputMode="numeric" minLength={6} maxLength={6} pattern="[0-9]{6}" required /></label></>}</>}
       {modal.kind !== "device" && <label>Team<AppSelect aria-label="Team" disabled={pending} value={team} onValueChange={value => setTeam(value as Team)}>{teams.map(value => <option key={value}>{value}</option>)}</AppSelect></label>}
-    </fieldset>{error && <p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><button className="button secondary" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="button primary" disabled={pending}>{pending ? "Saving..." : "Save"}</button></div></form>;
+    </fieldset>{modal.kind === "member" && !isLocalInventory() && <p className="muted">Share the work email and password with the employee after saving.</p>}{error && <p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><button className="button secondary" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="button primary" disabled={pending}>{pending ? "Saving..." : "Save"}</button></div></form>;
 }

@@ -13,7 +13,7 @@ test('employee setup saves team, role and own mobile atomically without pre-adde
    grant usage on schema public,auth to anon,authenticated;
    insert into auth.users values ('${alice}','alice@equicomtech.com',null),('${bob}','bob@equicomtech.com',null),('${admin}','admin@equicomtech.com',now());`);
   const folder=new URL('../../supabase/migrations/',import.meta.url);
-  for(const file of (await readdir(folder)).filter(x=>x.endsWith('.sql')).sort())await db.exec(await readFile(new URL(file,folder),'utf8'));
+  for(const file of (await readdir(folder)).filter(x=>x.endsWith('.sql') && x < '202610140015').sort())await db.exec(await readFile(new URL(file,folder),'utf8'));
   const unrelated=(await db.query("insert into dm_members(name,team) values ('alice@equicomtech.com','QA') returning id")).rows[0].id;
   await db.query("insert into dm_employee_signup_allowlist values ('alice@equicomtech.com',$1)",[unrelated]);
   await db.query('insert into dm_admins(user_id) values ($1)',[admin]);

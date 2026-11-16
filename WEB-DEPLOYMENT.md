@@ -1,3 +1,11 @@
+## Admin-created employee passwords (migration 015)
+
+Admins use **People → Add person** to enter full name, role, team, company work email, and a six-digit password. **Create login** on an existing person row creates credentials without duplicating the employee. Existing login passwords are never overwritten. The employee signs in with the credentials supplied by the admin, then selects a mobile to self-assign. The admin-entered team and role are already saved; there is no employee signup or password-reset UI.
+
+Apply `supabase/migrations/202610140015_admin_employee_logins.sql` before deploying. Admin-only preparation issues a private, short-lived, single-use token. An Auth insert trigger consumes it and creates the employee membership in the same transaction. User metadata without a valid token cannot enroll a new inventory user or grant admin access. Other apps using this Supabase project remain unaffected. The temporary signup client has a separate storage key and does not persist or broadcast its session, so creating a login preserves the admin session. Passwords are sent only to Supabase Auth and are never stored in member/profile/request tables.
+
+Keep shared Supabase Auth signup enabled and Confirm email disabled for admin provisioning. Public self-signup does not grant inventory access. The old `/signup/` URL now opens the shared sign-in page.
+
 ## Employee first-login setup (migration 014)
 
 The employee flow is company email + password → select Team, Role and current Mobile → Save and continue. Employees may choose Mobile, QA or Design and a job role; these choices do not confer admin privileges. An unassigned device can be claimed without a separate availability approval. A device held by another employee cannot be taken over. Employees with no device can finish setup and choose one later.

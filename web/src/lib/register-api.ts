@@ -27,7 +27,7 @@ async function allRows<T>(table: string, columns: string, order: string): Promis
   }
 }
 export async function loadRegister() {
-  if (isLocalInventory()) return localRegister();
+  if (isLocalInventory()) return { ...localRegister(), employeeLogins: [] as { member_id: string; email: string }[] };
   const { error: importError } = await database().rpc("dm_import_mobile_scans");
   // Keep the existing dashboard usable until the optional mobile-sync migration
   // has been run in the project's SQL editor.
@@ -36,7 +36,9 @@ export async function loadRegister() {
     allRows<Device>("dm_devices", "*", "id"),
     allRows<Member>("dm_members", "id,name,team,role", "id")
   ]);
-  return { devices, members };
+  const logins = await database().rpc("dm_admin_employee_logins");
+  if (logins.error) throw logins.error;
+  return { devices, members, employeeLogins: logins.data as { member_id: string; email: string }[] };
 }
 export async function loadAudit(deviceId?: string) {
   if (isLocalInventory()) return localAudit(deviceId);
