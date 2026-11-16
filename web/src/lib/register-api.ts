@@ -40,8 +40,9 @@ export async function loadRegister() {
   const logins = await database().rpc("dm_admin_employee_logins");
   if (logins.error) throw logins.error;
   const access = await database().rpc("dm_admin_employee_access");
-  if (access.error) throw access.error;
-  return { devices, members, employeeAccess: access.data as EmployeeAccess[], employeeLogins: logins.data as { member_id: string; email: string }[] };
+  // Admin delegation is optional until its database migration is installed.
+  if (access.error && !["PGRST202", "42883"].includes(access.error.code ?? "")) throw access.error;
+  return { devices, members, employeeAccess: (access.data ?? []) as EmployeeAccess[], employeeLogins: logins.data as { member_id: string; email: string }[] };
 }
 export async function loadAudit(deviceId?: string) {
   if (isLocalInventory()) return localAudit(deviceId);
