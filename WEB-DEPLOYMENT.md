@@ -1,3 +1,11 @@
+## Admin assignment from home inventory
+
+Admins can use **Assign** on an unassigned device card on the home page, select an active person, and confirm the assignment. Assigned devices retain **Transfer**. Assignments use the existing admin-only device update policy, current version check, active-holder trigger, and transactional audit history. Assigning a device also confirms its availability, matching the admin dashboard handover flow. No database migration is needed.
+
+Unassigned cards now display **Not assigned**. Previously, admin-only accounts with no employee member ID compared equal to an unassigned device's null holder ID and incorrectly displayed **Assigned to you**. Employee self-assignment and holder-only transfer continue through their existing RPCs.
+
+Validation: TypeScript, production build, database/domain suite, and desktop/mobile browser checks covering assignment, cancel, inactive/deleted recipient filtering, concurrent changes, employee self-assignment and transfer.
+
 ## Employee admin delegation (migration 017)
 
 On 16 November 2026, migration 017 was applied to the live Supabase project and the reviewed old `arshad@equicomtech.com` Auth identity was deleted after explicit owner confirmation. The reset reported zero old logins remaining. Recreate Arshad through People → Add person; admin access can then be granted separately.

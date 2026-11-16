@@ -23,12 +23,12 @@ export async function transferEmployeeDevice(device: EmployeeDevice, recipient: 
   if (isLocalInventory()) {
     const current = localRegister().devices.find(row => row.id === device.id);
     if (!current) throw new Error("Device no longer exists. Refresh and try again.");
-    return localUpdate({ ...current, version: device.version }, { holder_id: recipient });
+    return localUpdate({ ...current, version: device.version }, { holder_id: recipient, ...(admin ? { availability_confirmed: true } : {}) });
   }
   if (admin) {
-    const result = await database().from("dm_devices").update({ holder_id: recipient }).eq("id", device.id).eq("version", device.version).select().maybeSingle();
+    const result = await database().from("dm_devices").update({ holder_id: recipient, availability_confirmed: true }).eq("id", device.id).eq("version", device.version).select().maybeSingle();
     if (result.error) throw result.error;
-    if (!result.data) throw new Error("Device changed. Refresh before transferring.");
+    if (!result.data) throw new Error("Device changed. Refresh before assigning or transferring.");
     return result.data as Device;
   }
   const result = await database().rpc("dm_employee_transfer", { p_device_id: device.id, p_recipient_id: recipient, p_version: device.version });
